@@ -65,24 +65,63 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1><font size="+4">StocksProject </font></h1>
+  <header style="background-color:#111827; color:white; padding:1.5rem 0; text-align:center;">
+    <h1 style="margin:0; font-size:2rem;">Stock Analysis Hub</h1>
+    <p style="margin:0.5rem 0 0; font-size:0.95rem; opacity:0.9;">
+      Simple tools to explore stock performance across different timeframes.
+    </p>
   </header>
 
-  <sub> <center><font size="+3">Visualize stock value
-shifts of several
-companies at a glance</font></center></sub>
+  <main style="max-width:900px; margin:2rem auto; padding:0 1rem; font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    
+    <!-- Intro -->
+    <section style="margin-bottom:1.5rem;">
+      <p style="margin:0; font-size:0.95rem; line-height:1.5;">
+        Welcome to my stock project. This website explores how stock prices behave over different timeframes – 
+        short-term daily moves versus longer-term weekly and monthly trends.
+      </p>
+    </section>
 
-  <section>
-    <p><font size="-1">Welcome to my stock website project:</font></p>
-    <p><font size="-1">This website was created by Robin Jusserand to learn finance and web development while having fun :) </font></p>
-    <p><font size="-1">Warning – I am using Vintage API free API key to access and use the stock values limiting me to 25 searches per day.</font></p>
-    <p><font size="-1">  <a href="OneSliderPage.html">Here is the issue I am trying to solve</font></p>
-    <nav>
-      <a href="Top 20 Pharma.html"> <font size="+1">Pharma stocks</font></a>
-      <a href="StockTrackerEvolution.html"><font size="+1">On demand stock request</font></a>
-      <a href="BETA TEST.html"><font size="+1">Development and QA tab</font></a>
-    </nav>
-  </section>
+    <!-- Tools grid -->
+    <section style="display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:1rem; margin-bottom:2rem;">
+      
+      <!-- Multi-stock dashboard -->
+      <a href="StockTrackerEvolution.html" style="text-decoration:none; color:inherit;">
+        <div style="background:white; border-radius:0.75rem; padding:1rem 1.2rem; box-shadow:0 2px 6px rgba(0,0,0,0.08); border:1px solid #e5e7eb; height:100%;">
+          <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">📊 Multi-stock dashboard</h2>
+          <p style="margin:0; font-size:0.9rem; color:#4b5563;">
+            Compare several companies and view their daily, weekly, and monthly performance at a glance.
+          </p>
+        </div>
+      </a>
+
+      <!-- Pharma dashboard -->
+      <a href="Top 20 Pharma.html" style="text-decoration:none; color:inherit;">
+        <div style="background:white; border-radius:0.75rem; padding:1rem 1.2rem; box-shadow:0 2px 6px rgba(0,0,0,0.08); border:1px solid #e5e7eb; height:100%;">
+          <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">💊 Pharma sector tracker</h2>
+          <p style="margin:0; font-size:0.9rem; color:#4b5563;">
+            Focus on the top pharma names and see how they evolve over different time horizons.
+          </p>
+        </div>
+      </a>
+
+      <!-- Concept / explanation -->
+      <a href="OneSliderPage.html" style="text-decoration:none; color:inherit;">
+        <div style="background:white; border-radius:0.75rem; padding:1rem 1.2rem; box-shadow:0 2px 6px rgba(0,0,0,0.08); border:1px solid #e57eeb; height:100%;">
+          <h2 style="margin:0 0 0.5rem; font-size:1.1rem;">🧠 Concept behind the project</h2>
+          <p style="margin:0; font-size:0.9rem; color:#4b5563;">
+            Read the idea I am exploring: why looking at monthly evolution can reveal trends that daily moves hide.
+          </p>
+        </div>
+      </a>
+
+    </section>
+
+    <!-- API notice -->
+    <section style="font-size:0.8rem; color:#6b7280; background:#f3f4f6; padding:0.75rem 1rem; border-radius:0.5rem;">
+      <strong>Note:</strong> This project uses a free stock data API, which means requests are limited per day. 
+      If some data does not load, it may be due to this limit.
+    </section>
+  </main>
 </body>
 </html>
