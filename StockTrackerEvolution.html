@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+
+    header {
+      background-color: #333;
+      color: white;
+      text-align: center;
+      padding: 1em;
+    }
+
+    section {
+      max-width: 800px;
+      margin: 20px auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #4caf50;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    #stockData {
+      margin-top: 20px;
+    }
+
+    #stockData p {
+      margin: 10px 0;
+      font-size: 16px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 400px;
+      margin-top: 20px;
+    }
+
+    #homeButton {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background-color: #333;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Stock Tracker</h1>
+</header>
+<section id="stockSelection">
+  <form id="stockForm">
+    <label for="stockSymbol">Enter Stock Symbol or Name:</label>
+    <input type="text" id="stockSymbol" required />
+    <button type="button" onclick="getStockData()">Get Data</button>
+  </form>
+</section>
+<section id="stockData">
+  <!-- Display stock information here -->
+</section>
+
+<button id="homeButton" onclick="goToHome()">Home</button>
+
+<script>
+  async function getStockData() {
+    const apiKey = "S5KUD067OHAEXVLM";
+    const stockSymbol = document.getElementById("stockSymbol").value;
+    const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${stockSymbol}&apikey=${apiKey}`;
+
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      // Process the data and update the "stockData" section
+      updateStockData(data);
+    } catch (error) {
+      console.error("Error fetching stock data:", error);
+    }
+  }
+
+  function updateStockData(data) {
+    const latestDate = Object.keys(data["Time Series (Daily)"])[0];
+    const latestClose = parseFloat(
+      data["Time Series (Daily)"][latestDate]["4. close"]
+    );
+    const previousClose = parseFloat(
+      data["Time Series (Daily)"][
+        Object.keys(data["Time Series (Daily)"])[1]
+      ]["4. close"]
+    );
+
+    const dailyChange = (latestClose - previousClose).toFixed(2);
+    const dailyChangePercentage = (
+      (dailyChange / previousClose) *
+      100
+    ).toFixed(2);
+
+    const weekAgoDate = Object.keys(data["Time Series (Daily)"])[4];
+    const weekAgoClose = parseFloat(
+      data["Time Series (Daily)"][weekAgoDate]["4. close"]
+    );
+    const weekStartDate = formatDate(weekAgoDate);
+
+    const monthAgoDate = Object.keys(data["Time Series (Daily)"])[19];
+    const monthAgoClose = parseFloat(
+      data["Time Series (Daily)"][monthAgoDate]["4. close"]
+    );
+    const monthStartDate = formatDate(monthAgoDate);
+
+    const weekChange = (latestClose - weekAgoClose).toFixed(2);
+    const weekChangePercentage = (
+      (weekChange / weekAgoClose) *
+      100
+    ).toFixed(2);
+
+    const monthChange = (latestClose - monthAgoClose).toFixed(2);
+    const monthChangePercentage = (
+      (monthChange / monthAgoClose) *
+      100
+    ).toFixed(2);
+
+    // Display the latest closing price, daily change, and percentage change
+    document.getElementById("stockData").innerHTML = `
+      <p>Latest Closing Price: $${latestClose}</p>
+      <p>Daily Change: $${dailyChange} (${dailyChangePercentage}%) - From $${previousClose} to $${latestClose}</p>
+      <p>Weekly Change (${weekStartDate} to ${latestDate}): $${weekChange} (${weekChangePercentage}%) - From $${weekAgoClose} to $${latestClose}</p>
+      <p>Monthly Change (${monthStartDate} to ${latestDate}): $${monthChange} (${monthChangePercentage}%) - From $${monthAgoClose} to $${latestClose}</p>
+    `;
+  }
+
+  function goToHome() {
+    // Replace this with the link to your homepage
+    window.location.href = "https://stocksproject.glitch.me/";
+  }
+
+  function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  }
+</script>
+</body>
+</html>
