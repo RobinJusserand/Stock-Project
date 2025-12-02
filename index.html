@@ -3,6 +3,8 @@
 <head>
   <link rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet"
+      href="https://www.w3schools.com/w3css/4/w3.css">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock Project</title>
@@ -70,7 +72,10 @@
   <!-- Navbar (sit on top) -->
 <div class="w3-top">
   <div class="w3-bar w3-white w3-card" id="myNavbar">
-    <a href="#home" class="w3-bar-item w3-button w3-wide">LOGO</a>
+    <a href="#home" class="w3-bar-item w3-button w3-wide">
+      <img src="https://media.istockphoto.com/id/941624340/vector/finance-icon.jpg?s=612x612&w=0&k=20&c=YbWMt9NnuWnxEmN7J9cB8O4Hx1qHIavF1wYkyVh7caM=" 
+        alt="Logo" style="height:32px;">
+    </a>
     <!-- Right-sided navbar links -->
     <div class="w3-right w3-hide-small">
       <a href="#about" class="w3-bar-item w3-button">ABOUT</a>
@@ -164,19 +169,6 @@ function w3_open() {
   } else {
     mySidebar.style.display = 'block';
   }
-}
-
-// Close the sidebar with the close button
-function w3_close() {
-    mySidebar.style.display = "none";
-}
-
-  function w3_open() {
-  document.getElementById("mySidebar").style.display = "block";
-}
-
-function w3_close() {
-  document.getElementById("mySidebar").style.display = "none";
 }
   </script> 
   </main>
