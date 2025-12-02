@@ -121,6 +121,22 @@
       <strong>Note:</strong> This project uses a free stock data API, which means requests are limited per day. 
       If some data does not load, it may be due to this limit.
     </section>
+
+// Toggle between showing and hiding the sidebar when clicking the menu icon
+var mySidebar = document.getElementById("mySidebar");
+
+function w3_open() {
+  if (mySidebar.style.display === 'block') {
+    mySidebar.style.display = 'none';
+  } else {
+    mySidebar.style.display = 'block';
+  }
+}
+
+// Close the sidebar with the close button
+function w3_close() {
+    mySidebar.style.display = "none";
+}
   </main>
 </body>
 </html>
