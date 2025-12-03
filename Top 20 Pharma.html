@@ -81,7 +81,7 @@
   </section>
 
   <script>
-    const apiKey = 'D4UE1TIQ7VWSLRBN';
+    const apiKey = 'UCDdvuqdsNiZ878uC37cHVu3YnavWl6w';
     const companies = [
       { symbol: 'LLY', name: 'Eli Lilly' },
       { symbol: 'NVO', name: 'Novo Nordisk' },
@@ -104,27 +104,29 @@
     let monthlyRange = '';
 
     async function fetchStockData(symbol) {
-      const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
+  const apiUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?apikey=${apiKey}`;
 
-      try {
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+  try {
+    const response = await fetch(apiUrl);
+    const data = await response.json();
 
-        if (data['Time Series (Daily)']) {
-          return {
-            symbol,
-            name: companies.find(company => company.symbol === symbol).name,
-            data: data['Time Series (Daily)'],
-          };
-        } else {
-          console.error('Error fetching stock data:', data);
-          return null;
-        }
-      } catch (error) {
-        console.error('Error fetching stock data:', error);
-        return null;
-      }
+    if (data && data.historical) {
+      return {
+        symbol,
+        name: companies.find(company => company.symbol === symbol).name,
+        data: data.historical // array of {date, close}
+      };
+    } else {
+      console.error("FMP Error:", data);
+      return null;
     }
+
+  } catch (error) {
+    console.error("Fetch error:", error);
+    return null;
+  }
+}
+
 
     function formatDate(dateString) {
       const date = new Date(dateString);
@@ -153,33 +155,30 @@
         const stockData = await fetchStockData(company.symbol);
 
         if (stockData && stockData.data) {
-          const dates = Object.keys(stockData.data);
-          const latestDate = dates[0];
-          const latestPrice = parseFloat(stockData.data[latestDate]['4. close']).toFixed(2);
+          const history = stockData.data;
 
-          // Daily change
-          const previousDate = dates[1];
-          const previousClose = parseFloat(stockData.data[previousDate]['4. close']).toFixed(2);
-          const dailyChange = (latestPrice - previousClose).toFixed(2);
-          const dailyChangePercentage = (((latestPrice - previousClose) / previousClose) * 100).toFixed(2);
+const latest = history[0];
+const latestPrice = latest.close.toFixed(2);
 
-          // Weekly change
-          const weekAgoDate = dates[5];
-          const weekAgoPrice = parseFloat(stockData.data[weekAgoDate]['4. close']).toFixed(2);
-          const weeklyChange = (latestPrice - weekAgoPrice).toFixed(2);
-          const weeklyChangePercentage = (((latestPrice - weekAgoPrice) / weekAgoPrice) * 100).toFixed(2);
+const previous = history[1];
+const previousPrice = previous.close.toFixed(2);
 
-          // Monthly change
-          const monthAgoDate = dates[21];
-          const monthAgoPrice = parseFloat(stockData.data[monthAgoDate]['4. close']).toFixed(2);
-          const monthlyChange = (latestPrice - monthAgoPrice).toFixed(2);
-          const monthlyChangePercentage = (((latestPrice - monthAgoPrice) / monthAgoPrice) * 100).toFixed(2);
+// Weekly = 5th entry (approx)
+const weekAgo = history[5];
+const weekAgoPrice = weekAgo.close.toFixed(2);
+
+// Monthly = 22nd entry (approx trading days)
+const monthAgo = history[22];
+const monthAgoPrice = monthAgo.close.toFixed(2);
+
+          
 
           // Update date ranges
           if (!dailyRange) {
-            dailyRange = `From ${formatDate(previousDate)} to ${formatDate(latestDate)}`;
-            weeklyRange = `From ${formatDate(weekAgoDate)} to ${formatDate(latestDate)}`;
-            monthlyRange = `From ${formatDate(monthAgoDate)} to ${formatDate(latestDate)}`;
+            dailyRange = `From ${previous.date} to ${latest.date}`;
+            weeklyRange = `From ${weekAgo.date} to ${latest.date}`;
+            monthlyRange = `From ${monthAgo.date} to ${latest.date}`;
+
 
             document.getElementById('dailyRange').innerText = dailyRange;
             document.getElementById('weeklyRange').innerText = weeklyRange;
@@ -209,8 +208,9 @@
       const stockData = await fetchStockData(symbol);
 
       if (stockData) {
-        const dates = Object.keys(stockData.data);
-        const prices = dates.map(date => parseFloat(stockData.data[date]['4. close'])).reverse();
+        const dates = stockData.data.map(item => item.date).reverse();
+        const prices = stockData.data.map(item => item.close).reverse();
+    
 
         new Chart(ctx, {
           type: 'line',
