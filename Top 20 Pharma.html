@@ -81,163 +81,173 @@
   </section>
 
   <script>
-  const apiKey = 'UCDdvuqdsNiZ878uC37cHVu3YnavWl6w';
-  const companies = [
-    { symbol: 'LLY', name: 'Eli Lilly' },
-    { symbol: 'NVO', name: 'Novo Nordisk' },
-    { symbol: 'JNJ', name: 'Johnson & Johnson' },
-    { symbol: 'MRK', name: 'Merck' },
-    { symbol: 'NVS', name: 'Novartis' },
-    { symbol: 'AZN', name: 'AstraZeneca' },
-    { symbol: 'PFE', name: 'Pfizer' },
-    { symbol: 'SNY', name: 'Sanofi' },
-    { symbol: 'BMY', name: 'Bristol-Myers Squibb' },
-    { symbol: 'NVDA', name: 'Nvidia' },
-    { symbol: 'TSLA', name: 'Tesla' },
-    { symbol: 'AAPL', name: 'Apple' },
-    { symbol: 'MC.PA', name: 'LVMH' },
-    { symbol: 'MSFT', name: 'Microsoft' },
-  ];
+    // 👉 Put your own FMP API key here
+    const apiKey = 'UCDdvuqdsNiZ878uC37cHVu3YnavWl6w';
 
-  let dailyRange = '';
-  let weeklyRange = '';
-  let monthlyRange = '';
+    const companies = [
+      { symbol: 'LLY',  name: 'Eli Lilly' },
+      { symbol: 'NVO',  name: 'Novo Nordisk' },
+      { symbol: 'JNJ',  name: 'Johnson & Johnson' },
+      { symbol: 'MRK',  name: 'Merck' },
+      { symbol: 'NVS',  name: 'Novartis' },
+      { symbol: 'AZN',  name: 'AstraZeneca' },
+      { symbol: 'PFE',  name: 'Pfizer' },
+      { symbol: 'SNY',  name: 'Sanofi' },
+      { symbol: 'BMY',  name: 'Bristol-Myers Squibb' },
+      { symbol: 'NVDA', name: 'Nvidia' },
+      { symbol: 'TSLA', name: 'Tesla' },
+      { symbol: 'AAPL', name: 'Apple' },
+      { symbol: 'MC.PA',name: 'LVMH' },
+      { symbol: 'MSFT', name: 'Microsoft' },
+    ];
 
-  async function fetchStockData(symbol) {
-    const apiUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${symbol}?serietype=line&apikey=${apiKey}`;
+    let dailyRange = '';
+    let weeklyRange = '';
+    let monthlyRange = '';
 
-    try {
-      const response = await fetch(apiUrl);
-      const data = await response.json();
+    async function fetchStockData(symbol) {
+      // limit to last 60 days to avoid huge payloads
+      const apiUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${encodeURIComponent(symbol)}?serietype=line&timeseries=60&apikey=${apiKey}`;
 
-      if (data && data.historical && data.historical.length > 0) {
-        return {
-          symbol,
-          name: companies.find(company => company.symbol === symbol).name,
-          data: data.historical // array of {date, close}
-        };
-      } else {
-        console.error("FMP Error:", symbol, data);
+      try {
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data && data.historical && Array.isArray(data.historical) && data.historical.length > 1) {
+          return {
+            symbol,
+            name: companies.find(c => c.symbol === symbol)?.name || symbol,
+            data: data.historical  // newest -> oldest
+          };
+        } else {
+          console.error('FMP Error for', symbol, data);
+          return null;
+        }
+      } catch (error) {
+        console.error('Fetch error for', symbol, error);
         return null;
       }
-
-    } catch (error) {
-      console.error("Fetch error:", symbol, error);
-      return null;
     }
-  }
 
-  async function updateStockData() {
-    const stockDataSection = document.getElementById('stockData');
-    stockDataSection.innerHTML = `
-      <table id="stockTable">
-        <thead>
-          <tr>
-            <th>Company</th>
-            <th>Current Price</th>
-            <th>Daily Change <span class="changeDateRange" id="dailyRange"></span></th>
-            <th>Weekly Change <span class="changeDateRange" id="weeklyRange"></span></th>
-            <th>Monthly Change <span class="changeDateRange" id="monthlyRange"></span></th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    `;
-    const stockTableBody = document.querySelector('#stockTable tbody');
+    async function updateStockData() {
+      const stockDataSection = document.getElementById('stockData');
+      stockDataSection.innerHTML = `
+        <table id="stockTable">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Current Price</th>
+              <th>Daily Change <span class="changeDateRange" id="dailyRange"></span></th>
+              <th>Weekly Change <span class="changeDateRange" id="weeklyRange"></span></th>
+              <th>Monthly Change <span class="changeDateRange" id="monthlyRange"></span></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      `;
 
-    for (const company of companies) {
-      const stockData = await fetchStockData(company.symbol);
+      const stockTableBody = document.querySelector('#stockTable tbody');
 
-      if (stockData && stockData.data && stockData.data.length > 2) {
-        const history = stockData.data; // already sorted newest -> oldest
+      for (const company of companies) {
+        const stockData = await fetchStockData(company.symbol);
 
-        // Safety for small histories
-        const latest      = history[0];
-        const previous    = history[1];
-        const weekAgo     = history[Math.min(5,  history.length - 1)];
-        const monthAgo    = history[Math.min(22, history.length - 1)];
+        if (stockData && stockData.data) {
+          const history = stockData.data; // newest -> older
 
-        const latestPrice   = latest.close;
-        const previousPrice = previous.close;
-        const weekAgoPrice  = weekAgo.close;
-        const monthAgoPrice = monthAgo.close;
+          // make sure we have enough data points
+          if (history.length < 2) {
+            const stockRow = document.createElement('tr');
+            stockRow.innerHTML = `<td colspan="5">${company.name} (${company.symbol}): Not enough data</td>`;
+            stockTableBody.appendChild(stockRow);
+            continue;
+          }
 
-        // Daily change
-        const dailyChange           = (latestPrice - previousPrice);
-        const dailyChangePercentage = (dailyChange / previousPrice) * 100;
+          const latest   = history[0];
+          const previous = history[1];
+          const weekAgo  = history[Math.min(5,  history.length - 1)];
+          const monthAgo = history[Math.min(22, history.length - 1)];
 
-        // Weekly change
-        const weeklyChange           = (latestPrice - weekAgoPrice);
-        const weeklyChangePercentage = (weeklyChange / weekAgoPrice) * 100;
+          const latestPrice   = latest.close;
+          const previousPrice = previous.close;
+          const weekAgoPrice  = weekAgo.close;
+          const monthAgoPrice = monthAgo.close;
 
-        // Monthly change
-        const monthlyChange           = (latestPrice - monthAgoPrice);
-        const monthlyChangePercentage = (monthlyChange / monthAgoPrice) * 100;
+          // Daily change
+          const dailyChange           = latestPrice - previousPrice;
+          const dailyChangePercentage = (dailyChange / previousPrice) * 100;
 
-        // Update date ranges (only once)
-        if (!dailyRange) {
-          dailyRange   = `From ${previous.date} to ${latest.date}`;
-          weeklyRange  = `From ${weekAgo.date} to ${latest.date}`;
-          monthlyRange = `From ${monthAgo.date} to ${latest.date}`;
+          // Weekly change
+          const weeklyChange           = latestPrice - weekAgoPrice;
+          const weeklyChangePercentage = (weeklyChange / weekAgoPrice) * 100;
 
-          document.getElementById('dailyRange').innerText   = dailyRange;
-          document.getElementById('weeklyRange').innerText  = weeklyRange;
-          document.getElementById('monthlyRange').innerText = monthlyRange;
+          // Monthly change
+          const monthlyChange           = latestPrice - monthAgoPrice;
+          const monthlyChangePercentage = (monthlyChange / monthAgoPrice) * 100;
+
+          // Set date ranges once
+          if (!dailyRange) {
+            dailyRange   = `From ${previous.date} to ${latest.date}`;
+            weeklyRange  = `From ${weekAgo.date} to ${latest.date}`;
+            monthlyRange = `From ${monthAgo.date} to ${latest.date}`;
+
+            document.getElementById('dailyRange').innerText   = dailyRange;
+            document.getElementById('weeklyRange').innerText  = weeklyRange;
+            document.getElementById('monthlyRange').innerText = monthlyRange;
+          }
+
+          const stockRow = document.createElement('tr');
+          stockRow.innerHTML = `
+            <td>${stockData.name} (${stockData.symbol})</td>
+            <td>$${latestPrice.toFixed(2)}</td>
+            <td>$${dailyChange.toFixed(2)} (${dailyChangePercentage.toFixed(2)}%)</td>
+            <td>$${weeklyChange.toFixed(2)} (${weeklyChangePercentage.toFixed(2)}%)</td>
+            <td>$${monthlyChange.toFixed(2)} (${monthlyChangePercentage.toFixed(2)}%)</td>
+          `;
+          stockTableBody.appendChild(stockRow);
+        } else {
+          const stockRow = document.createElement('tr');
+          stockRow.innerHTML = `<td colspan="5">${company.name} (${company.symbol}): No data available</td>`;
+          stockTableBody.appendChild(stockRow);
         }
-
-        const stockRow = document.createElement('tr');
-        stockRow.innerHTML = `
-          <td>${stockData.name} (${stockData.symbol})</td>
-          <td>$${latestPrice.toFixed(2)}</td>
-          <td>$${dailyChange.toFixed(2)} (${dailyChangePercentage.toFixed(2)}%)</td>
-          <td>$${weeklyChange.toFixed(2)} (${weeklyChangePercentage.toFixed(2)}%)</td>
-          <td>$${monthlyChange.toFixed(2)} (${monthlyChangePercentage.toFixed(2)}%)</td>
-        `;
-        stockTableBody.appendChild(stockRow);
-      } else {
-        const stockRow = document.createElement('tr');
-        stockRow.innerHTML = `<td colspan="5">${company.name} (${company.symbol}): No data available</td>`;
-        stockTableBody.appendChild(stockRow);
       }
     }
-  }
 
-  async function showEvolution(symbol) {
-    const chartCanvas = document.getElementById('stockChart');
-    const ctx = chartCanvas.getContext('2d');
-    const stockData = await fetchStockData(symbol);
+    async function showEvolution(symbol) {
+      const chartCanvas = document.getElementById('stockChart');
+      const ctx = chartCanvas.getContext('2d');
+      const stockData = await fetchStockData(symbol);
 
-    if (stockData && stockData.data && stockData.data.length > 0) {
-      // Limit to e.g. last 60 days for readability
-      const slice = stockData.data.slice(0, 60); // newest -> older
-      const dates  = slice.map(item => item.date).reverse();
-      const prices = slice.map(item => item.close).reverse();
+      if (stockData && stockData.data && stockData.data.length > 0) {
+        // take last 60 days max, oldest -> newest for chart
+        const slice  = stockData.data.slice(0, 60).reverse();
+        const dates  = slice.map(item => item.date);
+        const prices = slice.map(item => item.close);
 
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: dates,
-          datasets: [
-            {
-              label: `${stockData.name} (${symbol}) Stock Price`,
-              borderColor: 'rgba(75, 192, 192, 1)',
-              data: prices,
-              fill: false,
-            },
-          ],
-        },
-      });
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: [
+              {
+                label: `${stockData.name} (${symbol}) Stock Price`,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                data: prices,
+                fill: false,
+              },
+            ],
+          },
+        });
+      }
     }
-  }
 
-  document.getElementById('homeButton').addEventListener('click', () => {
-    window.location.href = 'index.html';
-  });
+    document.getElementById('homeButton').addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
 
-  window.onload = function () {
-    updateStockData();
-    showEvolution('MRK');
-  };
-</script>
+    window.onload = function () {
+      updateStockData();
+      showEvolution('MRK');
+    };
+  </script>
 </body>
 </html>
