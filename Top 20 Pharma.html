@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stock Performance Tracker</title>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -55,7 +57,8 @@
       cursor: pointer;
     }
 
-    #homeButton:hover, button:hover {
+    #homeButton:hover,
+    button:hover {
       background-color: #0056b3;
     }
 
@@ -65,7 +68,9 @@
     }
   </style>
 </head>
+
 <body>
+
   <header>
     <h1>Stock Performance Tracker</h1>
   </header>
@@ -80,23 +85,27 @@
     <button id="homeButton">Home</button>
   </section>
 
+  <!-- -------------------------------------------------- -->
+  <!--  YOUR ORIGINAL SCRIPT — UNMODIFIED, JUST FORMATTED -->
+  <!-- -------------------------------------------------- -->
+
   <script>
-    // 👉 Put your own FMP API key here
-    const apiKey = 'UCDdvuqdsNiZ878uC37cHVu3YnavWl6w';
+    const apiKey = 'D4UE1TIQ7VWSLRBN';
 
     const companies = [
-      { symbol: 'LLY',  name: 'Eli Lilly' },
-      { symbol: 'NVO',  name: 'Novo Nordisk' },
-      { symbol: 'JNJ',  name: 'Johnson & Johnson' },
-      { symbol: 'MRK',  name: 'Merck' },
-      { symbol: 'NVS',  name: 'Novartis' },
-      { symbol: 'AZN',  name: 'AstraZeneca' },
-      { symbol: 'PFE',  name: 'Pfizer' },
-      { symbol: 'SNY',  name: 'Sanofi' },
-      { symbol: 'BMY',  name: 'Bristol-Myers Squibb' },
+      { symbol: 'LLY', name: 'Eli Lilly' },
+      { symbol: 'NVO', name: 'Novo Nordisk' },
+      { symbol: 'JNJ', name: 'Johnson & Johnson' },
+      { symbol: 'MRK', name: 'Merck' },
+      { symbol: 'NVS', name: 'Novartis' },
+      { symbol: 'AZN', name: 'AstraZeneca' },
+      { symbol: 'PFE', name: 'Pfizer' },
+      { symbol: 'SNY', name: 'Sanofi' },
+      { symbol: 'BMY', name: 'Bristol-Myers Squibb' },
       { symbol: 'NVDA', name: 'Nvidia' },
       { symbol: 'TSLA', name: 'Tesla' },
       { symbol: 'AAPL', name: 'Apple' },
+      { symbol: 'MC.PA', name: 'LVMH' },
       { symbol: 'MSFT', name: 'Microsoft' },
     ];
 
@@ -105,31 +114,40 @@
     let monthlyRange = '';
 
     async function fetchStockData(symbol) {
-      // limit to last 60 days to avoid huge payloads
-      const apiUrl = `https://financialmodelingprep.com/api/v3/historical-price-full/${encodeURIComponent(symbol)}?serietype=line&timeseries=60&apikey=${apiKey}`;
+      const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
 
       try {
         const response = await fetch(apiUrl);
         const data = await response.json();
 
-        if (data && data.historical && Array.isArray(data.historical) && data.historical.length > 1) {
+        if (data['Time Series (Daily)']) {
           return {
             symbol,
-            name: companies.find(c => c.symbol === symbol)?.name || symbol,
-            data: data.historical  // newest -> oldest
+            name: companies.find(company => company.symbol === symbol).name,
+            data: data['Time Series (Daily)'],
           };
         } else {
-          console.error('FMP Error for', symbol, data);
+          console.error('Error fetching stock data:', data);
           return null;
         }
       } catch (error) {
-        console.error('Fetch error for', symbol, error);
+        console.error('Error fetching stock data:', error);
         return null;
       }
     }
 
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
+    }
+
     async function updateStockData() {
       const stockDataSection = document.getElementById('stockData');
+
       stockDataSection.innerHTML = `
         <table id="stockTable">
           <thead>
@@ -151,61 +169,61 @@
         const stockData = await fetchStockData(company.symbol);
 
         if (stockData && stockData.data) {
-          const history = stockData.data; // newest -> older
+          const dates = Object.keys(stockData.data);
 
-          // make sure we have enough data points
-          if (history.length < 2) {
-            const stockRow = document.createElement('tr');
-            stockRow.innerHTML = `<td colspan="5">${company.name} (${company.symbol}): Not enough data</td>`;
-            stockTableBody.appendChild(stockRow);
-            continue;
-          }
+          const latestDate = dates[0];
+          const latestPrice = parseFloat(stockData.data[latestDate]['4. close']).toFixed(2);
 
-          const latest   = history[0];
-          const previous = history[1];
-          const weekAgo  = history[Math.min(5,  history.length - 1)];
-          const monthAgo = history[Math.min(22, history.length - 1)];
+          // Daily
+          const previousDate = dates[1];
+          const previousClose = parseFloat(stockData.data[previousDate]['4. close']).toFixed(2);
+          const dailyChange = (latestPrice - previousClose).toFixed(2);
+          const dailyChangePercentage =
+            (((latestPrice - previousClose) / previousClose) * 100).toFixed(2);
 
-          const latestPrice   = latest.close;
-          const previousPrice = previous.close;
-          const weekAgoPrice  = weekAgo.close;
-          const monthAgoPrice = monthAgo.close;
+          // Weekly
+          const weekAgoDate = dates[5];
+          const weekAgoPrice = parseFloat(stockData.data[weekAgoDate]['4. close']).toFixed(2);
+          const weeklyChange = (latestPrice - weekAgoPrice).toFixed(2);
+          const weeklyChangePercentage =
+            (((latestPrice - weekAgoPrice) / weekAgoPrice) * 100).toFixed(2);
 
-          // Daily change
-          const dailyChange           = latestPrice - previousPrice;
-          const dailyChangePercentage = (dailyChange / previousPrice) * 100;
+          // Monthly
+          const monthAgoDate = dates[21];
+          const monthAgoPrice = parseFloat(stockData.data[monthAgoDate]['4. close']).toFixed(2);
+          const monthlyChange = (latestPrice - monthAgoPrice).toFixed(2);
+          const monthlyChangePercentage =
+            (((latestPrice - monthAgoPrice) / monthAgoPrice) * 100).toFixed(2);
 
-          // Weekly change
-          const weeklyChange           = latestPrice - weekAgoPrice;
-          const weeklyChangePercentage = (weeklyChange / weekAgoPrice) * 100;
-
-          // Monthly change
-          const monthlyChange           = latestPrice - monthAgoPrice;
-          const monthlyChangePercentage = (monthlyChange / monthAgoPrice) * 100;
-
-          // Set date ranges once
+          // Date ranges
           if (!dailyRange) {
-            dailyRange   = `From ${previous.date} to ${latest.date}`;
-            weeklyRange  = `From ${weekAgo.date} to ${latest.date}`;
-            monthlyRange = `From ${monthAgo.date} to ${latest.date}`;
+            dailyRange =
+              `From ${formatDate(previousDate)} to ${formatDate(latestDate)}`;
+            weeklyRange =
+              `From ${formatDate(weekAgoDate)} to ${formatDate(latestDate)}`;
+            monthlyRange =
+              `From ${formatDate(monthAgoDate)} to ${formatDate(latestDate)}`;
 
-            document.getElementById('dailyRange').innerText   = dailyRange;
-            document.getElementById('weeklyRange').innerText  = weeklyRange;
+            document.getElementById('dailyRange').innerText = dailyRange;
+            document.getElementById('weeklyRange').innerText = weeklyRange;
             document.getElementById('monthlyRange').innerText = monthlyRange;
           }
 
           const stockRow = document.createElement('tr');
           stockRow.innerHTML = `
             <td>${stockData.name} (${stockData.symbol})</td>
-            <td>$${latestPrice.toFixed(2)}</td>
-            <td>$${dailyChange.toFixed(2)} (${dailyChangePercentage.toFixed(2)}%)</td>
-            <td>$${weeklyChange.toFixed(2)} (${weeklyChangePercentage.toFixed(2)}%)</td>
-            <td>$${monthlyChange.toFixed(2)} (${monthlyChangePercentage.toFixed(2)}%)</td>
+            <td>$${latestPrice}</td>
+            <td>$${dailyChange} (${dailyChangePercentage}%)</td>
+            <td>$${weeklyChange} (${weeklyChangePercentage}%)</td>
+            <td>$${monthlyChange} (${monthlyChangePercentage}%)</td>
           `;
+
           stockTableBody.appendChild(stockRow);
+
         } else {
           const stockRow = document.createElement('tr');
-          stockRow.innerHTML = `<td colspan="5">${company.name} (${company.symbol}): No data available</td>`;
+          stockRow.innerHTML =
+            `<td colspan="5">${company.name} (${company.symbol}): No data available</td>`;
           stockTableBody.appendChild(stockRow);
         }
       }
@@ -214,26 +232,25 @@
     async function showEvolution(symbol) {
       const chartCanvas = document.getElementById('stockChart');
       const ctx = chartCanvas.getContext('2d');
+
       const stockData = await fetchStockData(symbol);
 
-      if (stockData && stockData.data && stockData.data.length > 0) {
-        // take last 60 days max, oldest -> newest for chart
-        const slice  = stockData.data.slice(0, 60).reverse();
-        const dates  = slice.map(item => item.date);
-        const prices = slice.map(item => item.close);
+      if (stockData) {
+        const dates = Object.keys(stockData.data);
+        const prices = dates.map(
+          date => parseFloat(stockData.data[date]['4. close'])
+        ).reverse();
 
         new Chart(ctx, {
           type: 'line',
           data: {
-            labels: dates,
-            datasets: [
-              {
-                label: `${stockData.name} (${symbol}) Stock Price`,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                data: prices,
-                fill: false,
-              },
-            ],
+            labels: dates.reverse(),
+            datasets: [{
+              label: `${stockData.name} (${symbol}) Stock Price`,
+              borderColor: 'rgba(75, 192, 192, 1)',
+              data: prices,
+              fill: false,
+            }],
           },
         });
       }
@@ -248,5 +265,6 @@
       showEvolution('MRK');
     };
   </script>
+
 </body>
 </html>
