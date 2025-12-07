@@ -73,6 +73,7 @@
   </style>
 </head>
 <body>
+  
   <!-- Navbar (sit on top) -->
 <div class="w3-top">
   <div class="w3-bar w3-white w3-card" id="myNavbar">
@@ -100,6 +101,31 @@
   <a href="#about-me" onclick="w3_close()" class="w3-bar-item w3-button">TEAM</a>
   <a href="#contact" onclick="w3_close()" class="w3-bar-item w3-button">CONTACT</a>
 </nav>
+<div id="authStatus" style="position:absolute; top:20px; right:20px; font-size:14px;"></div>
+
+<script>
+  const userEmail = localStorage.getItem("loggedInEmail");
+  const auth = document.getElementById("authStatus");
+
+  if (userEmail) {
+    auth.innerHTML = `
+      Logged in as <b>${userEmail}</b> |
+      <a href="#" id="logoutBtn">Logout</a>
+    `;
+  } else {
+    auth.innerHTML = `
+      <a href="login.html">Login</a>
+    `;
+  }
+
+  // Logout behavior
+  if (userEmail) {
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("loggedInEmail");
+      window.location.reload();
+    });
+  }
+</script>
 
   <header style="background-color:#111827; color:white; padding:1.5rem 0; text-align:center;">
     <h1 style="margin:0; font-size:2rem;">Stock Project</h1>
