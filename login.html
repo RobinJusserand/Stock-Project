@@ -30,15 +30,17 @@
   <a href="index.html"></a>
   <button onclick="window.location.href='index.html'">Back to Home</button>
   
-<script>
-  const form = document.getElementById("loginForm");
-  const emailInput = document.getElementById("email");
+  <!-- This script saves the email in localStorage on the GITHUB domain -->
+  <script>
+    const form = document.getElementById("loginForm");
+    const emailInput = document.getElementById("email");
 
-  form.addEventListener("submit", () => {
-    // Save the email to localStorage on GitHub domain
-    localStorage.setItem("loggedInEmail", emailInput.value);
-  });
-</script>
+    form.addEventListener("submit", () => {
+      // Save email before leaving the page
+      localStorage.setItem("loggedInEmail", emailInput.value);
+    });
+  </script>
+
 
 </body>
 </html>
