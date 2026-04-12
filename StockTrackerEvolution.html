@@ -1,4 +1,4 @@
-.h<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -32,6 +32,7 @@
     label {
       display: block;
       margin-bottom: 5px;
+      font-weight: bold;
     }
 
     input {
@@ -39,15 +40,18 @@
       padding: 8px;
       margin-bottom: 10px;
       box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
 
     button {
       background-color: #4caf50;
       color: white;
-      padding: 10px;
+      padding: 10px 20px;
       border: none;
       border-radius: 5px;
       cursor: pointer;
+      font-size: 15px;
     }
 
     button:hover {
@@ -61,11 +65,17 @@
     #stockData p {
       margin: 10px 0;
       font-size: 16px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background: #f9f9f9;
     }
+
+    .positive { color: #2e7d32; font-weight: bold; }
+    .negative { color: #c62828; font-weight: bold; }
+    .neutral  { color: #555; }
 
     canvas {
       width: 100%;
-      height: 400px;
       margin-top: 20px;
     }
 
@@ -80,101 +90,256 @@
       border-radius: 5px;
       cursor: pointer;
     }
+
+    #homeButton:hover {
+      background-color: #555;
+    }
+
+    /* Loading spinner */
+    #loader {
+      display: none;
+      text-align: center;
+      padding: 20px;
+      font-size: 16px;
+      color: #555;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #ccc;
+      border-top-color: #333;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #errorMsg {
+      color: #c62828;
+      background: #fdecea;
+      border: 1px solid #f5c6cb;
+      padding: 10px 14px;
+      border-radius: 4px;
+      display: none;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
+
 <header>
   <h1>Stock Tracker</h1>
 </header>
+
 <section id="stockSelection">
-  <form id="stockForm">
-    <label for="stockSymbol">Enter Stock Symbol or Name:</label>
-    <input type="text" id="stockSymbol" required />
-    <button type="button" onclick="getStockData()">Get Data</button>
+  <form id="stockForm" onsubmit="event.preventDefault(); getStockData();">
+    <label for="stockSymbol">Enter Stock Symbol (e.g. AAPL, TSLA, MSFT):</label>
+    <input type="text" id="stockSymbol" placeholder="e.g. AAPL" required />
+    <button type="submit">Get Data</button>
   </form>
-</section>
-<section id="stockData">
-  <!-- Display stock information here -->
+  <div id="loader"><span class="spinner"></span> Fetching stock data…</div>
+  <div id="errorMsg"></div>
 </section>
 
-<button id="homeButton" onclick="goToHome()">Home</button>
+<section id="stockData">
+  <!-- Stock information will appear here -->
+</section>
+
+<section id="chartSection" style="display:none;">
+  <h2 id="chartTitle">Price History</h2>
+  <canvas id="stockChart"></canvas>
+</section>
+
+<button id="homeButton" onclick="window.location.href='index.html'">Home</button>
 
 <script>
+  const API_KEY = "S5KUD067OHAEXVLM";
+  let chartInstance = null;
+
   async function getStockData() {
-    const apiKey = "S5KUD067OHAEXVLM";
-    const stockSymbol = document.getElementById("stockSymbol").value;
-    const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${stockSymbol}&apikey=${apiKey}`;
+    const symbolRaw = document.getElementById("stockSymbol").value.trim().toUpperCase();
+
+    if (!symbolRaw) return;
+
+    showLoader(true);
+    clearError();
+    document.getElementById("stockData").innerHTML = "";
+    document.getElementById("chartSection").style.display = "none";
+
+    const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbolRaw}&apikey=${API_KEY}`;
 
     try {
       const response = await fetch(apiUrl);
       const data = await response.json();
 
-      // Process the data and update the "stockData" section
-      updateStockData(data);
+      // Handle API-level errors
+      if (data["Note"]) {
+        showError("API rate limit reached. Please wait a minute and try again.");
+        return;
+      }
+      if (data["Error Message"]) {
+        showError(`Could not find data for symbol "${symbolRaw}". Please check the ticker and try again.`);
+        return;
+      }
+      if (!data["Time Series (Daily)"]) {
+        showError("No data returned. The symbol may be invalid or the API is temporarily unavailable.");
+        return;
+      }
+
+      updateStockData(data, symbolRaw);
+      renderChart(data, symbolRaw);
+
     } catch (error) {
-      console.error("Error fetching stock data:", error);
+      showError("Network error — could not fetch stock data. Please check your connection and try again.");
+      console.error("Fetch error:", error);
+    } finally {
+      showLoader(false);
     }
   }
 
-  function updateStockData(data) {
-    const latestDate = Object.keys(data["Time Series (Daily)"])[0];
-    const latestClose = parseFloat(
-      data["Time Series (Daily)"][latestDate]["4. close"]
-    );
-    const previousClose = parseFloat(
-      data["Time Series (Daily)"][
-        Object.keys(data["Time Series (Daily)"])[1]
-      ]["4. close"]
-    );
+  function updateStockData(data, symbol) {
+    const timeSeries = data["Time Series (Daily)"];
+    const dates = Object.keys(timeSeries);
 
-    const dailyChange = (latestClose - previousClose).toFixed(2);
-    const dailyChangePercentage = (
-      (dailyChange / previousClose) *
-      100
-    ).toFixed(2);
+    // Guard against missing data points
+    if (dates.length < 2) {
+      showError("Not enough data available for this stock.");
+      return;
+    }
 
-    const weekAgoDate = Object.keys(data["Time Series (Daily)"])[4];
-    const weekAgoClose = parseFloat(
-      data["Time Series (Daily)"][weekAgoDate]["4. close"]
-    );
-    const weekStartDate = formatDate(weekAgoDate);
+    const latestDate    = dates[0];
+    const previousDate  = dates[1];
+    const weekAgoDate   = dates[Math.min(5, dates.length - 1)];
+    const monthAgoDate  = dates[Math.min(21, dates.length - 1)];
 
-    const monthAgoDate = Object.keys(data["Time Series (Daily)"])[19];
-    const monthAgoClose = parseFloat(
-      data["Time Series (Daily)"][monthAgoDate]["4. close"]
-    );
-    const monthStartDate = formatDate(monthAgoDate);
+    const latestClose   = parseFloat(timeSeries[latestDate]["4. close"]);
+    const previousClose = parseFloat(timeSeries[previousDate]["4. close"]);
+    const weekAgoClose  = parseFloat(timeSeries[weekAgoDate]["4. close"]);
+    const monthAgoClose = parseFloat(timeSeries[monthAgoDate]["4. close"]);
 
-    const weekChange = (latestClose - weekAgoClose).toFixed(2);
-    const weekChangePercentage = (
-      (weekChange / weekAgoClose) *
-      100
-    ).toFixed(2);
+    const dailyChange   = latestClose - previousClose;
+    const weekChange    = latestClose - weekAgoClose;
+    const monthChange   = latestClose - monthAgoClose;
 
-    const monthChange = (latestClose - monthAgoClose).toFixed(2);
-    const monthChangePercentage = (
-      (monthChange / monthAgoClose) *
-      100
-    ).toFixed(2);
+    const fmt = (n) => n.toFixed(2);
+    const pct = (change, base) => ((change / base) * 100).toFixed(2);
 
-    // Display the latest closing price, daily change, and percentage change
     document.getElementById("stockData").innerHTML = `
-      <p>Latest Closing Price: $${latestClose}</p>
-      <p>Daily Change: $${dailyChange} (${dailyChangePercentage}%) - From $${previousClose} to $${latestClose}</p>
-      <p>Weekly Change (${weekStartDate} to ${latestDate}): $${weekChange} (${weekChangePercentage}%) - From $${weekAgoClose} to $${latestClose}</p>
-      <p>Monthly Change (${monthStartDate} to ${latestDate}): $${monthChange} (${monthChangePercentage}%) - From $${monthAgoClose} to $${latestClose}</p>
+      <h2 style="margin-bottom:12px;">${symbol}</h2>
+      <p><strong>Latest Closing Price:</strong> $${fmt(latestClose)}</p>
+      <p>
+        <strong>Daily Change</strong>
+        <span style="font-size:0.85em;color:gray;">(${formatDate(previousDate)} → ${formatDate(latestDate)})</span>:
+        <span class="${colorClass(dailyChange)}">
+          ${dailyChange >= 0 ? '+' : ''}$${fmt(dailyChange)} (${pct(dailyChange, previousClose)}%)
+        </span>
+      </p>
+      <p>
+        <strong>Weekly Change</strong>
+        <span style="font-size:0.85em;color:gray;">(${formatDate(weekAgoDate)} → ${formatDate(latestDate)})</span>:
+        <span class="${colorClass(weekChange)}">
+          ${weekChange >= 0 ? '+' : ''}$${fmt(weekChange)} (${pct(weekChange, weekAgoClose)}%)
+        </span>
+      </p>
+      <p>
+        <strong>Monthly Change</strong>
+        <span style="font-size:0.85em;color:gray;">(${formatDate(monthAgoDate)} → ${formatDate(latestDate)})</span>:
+        <span class="${colorClass(monthChange)}">
+          ${monthChange >= 0 ? '+' : ''}$${fmt(monthChange)} (${pct(monthChange, monthAgoClose)}%)
+        </span>
+      </p>
     `;
   }
 
-  function goToHome() {
-    // Replace this with the link to your homepage
-    window.location.href = "index.html";
+  function renderChart(data, symbol) {
+    const timeSeries = data["Time Series (Daily)"];
+    const dates  = Object.keys(timeSeries).slice(0, 60).reverse();
+    const prices = dates.map(d => parseFloat(timeSeries[d]["4. close"]));
+
+    // Destroy previous chart instance before creating a new one
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+
+    const ctx = document.getElementById("stockChart").getContext("2d");
+    document.getElementById("chartTitle").textContent = `${symbol} — Last 60 Trading Days`;
+    document.getElementById("chartSection").style.display = "block";
+
+    chartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: dates,
+        datasets: [{
+          label: `${symbol} Closing Price`,
+          data: prices,
+          borderColor: "rgba(75, 192, 192, 1)",
+          backgroundColor: "rgba(75, 192, 192, 0.1)",
+          borderWidth: 2,
+          pointRadius: 2,
+          fill: true,
+          tension: 0.3,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { maxTicksLimit: 10, maxRotation: 30 }
+          },
+          y: {
+            ticks: {
+              callback: (val) => `$${val.toFixed(0)}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // --- Helpers ---
+
+  function colorClass(change) {
+    if (change > 0) return "positive";
+    if (change < 0) return "negative";
+    return "neutral";
   }
 
   function formatDate(dateString) {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function showLoader(show) {
+    document.getElementById("loader").style.display = show ? "block" : "none";
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("errorMsg");
+    el.textContent = msg;
+    el.style.display = "block";
+  }
+
+  function clearError() {
+    const el = document.getElementById("errorMsg");
+    el.textContent = "";
+    el.style.display = "none";
   }
 </script>
+
 </body>
 </html>
