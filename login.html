@@ -1,90 +1,198 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Login</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — StockView</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   12px;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      max-width: 400px;
-      margin: 60px auto;
-      padding: 20px;
-      background-color: #f4f4f4;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
     }
-    h1 { text-align: center; }
-    .form-box {
-      background: white;
-      padding: 30px;
+
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-decoration: none;
+      color: var(--text);
+      margin-bottom: 2rem;
+      letter-spacing: -0.3px;
+    }
+    .brand span { color: var(--accent); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.25rem 2rem;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .card h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .card .subtitle {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .form-group { margin-bottom: 1.25rem; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.45rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
     }
-    label { display: block; margin-bottom: 5px; font-weight: bold; }
-    input {
+
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); opacity: 0.6; }
+
+    .btn-submit {
       width: 100%;
-      padding: 8px;
-      margin-bottom: 15px;
-      box-sizing: border-box;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      width: 100%;
-      background-color: #4caf50;
+      background: var(--accent);
       color: white;
-      padding: 10px;
       border: none;
-      border-radius: 5px;
+      border-radius: 8px;
+      padding: 0.8rem;
+      font-size: 1rem;
+      font-weight: 700;
       cursor: pointer;
-      font-size: 16px;
+      margin-top: 0.5rem;
+      transition: background 0.2s, transform 0.15s;
     }
-    button:hover { background-color: #45a049; }
-    .links { margin-top: 15px; text-align: center; }
-    .links a { margin: 0 10px; color: #333; }
-    #errorMsg { color: red; text-align: center; margin-bottom: 10px; display: none; }
+    .btn-submit:hover { background: var(--accent-h); transform: translateY(-1px); }
+
+    .error-msg {
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      color: #fca5a5;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+
+    .divider {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 1.5rem 0 0;
+    }
+
+    .divider a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .divider a:hover { text-decoration: underline; }
+
+    .back-link {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--text); }
   </style>
 </head>
 <body>
-  <h1>Login</h1>
 
-  <div class="form-box">
-    <p id="errorMsg"></p>
+  <a href="index.html" class="brand">Stock<span>View</span></a>
+
+  <div class="card">
+    <h1>Welcome back</h1>
+    <p class="subtitle">Log in to your StockView account</p>
+
+    <div class="error-msg" id="errorMsg"></div>
+
     <form id="loginForm" action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/login" method="POST">
-      <div>
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required />
       </div>
 
-      <div>
-        <label for="pass">Password:</label>
-        <input type="password" id="pass" name="password" required placeholder="Enter your password">
+      <div class="form-group">
+        <label for="pass">Password</label>
+        <input type="password" id="pass" name="password" placeholder="Enter your password" required />
       </div>
 
-      <button type="submit">Login</button>
+      <button type="submit" class="btn-submit">Log In</button>
     </form>
 
-    <div class="links">
-      <a href="Account.html">Don't have an account? Register</a>
-      &nbsp;|&nbsp;
-      <a href="index.html">Back to Home</a>
+    <div class="divider">
+      Don't have an account? <a href="Account.html">Sign up</a>
     </div>
   </div>
 
+  <a href="index.html" class="back-link">
+    <i class="fa fa-arrow-left"></i> Back to home
+  </a>
+
   <script>
-    const form = document.getElementById("loginForm");
-    const emailInput = document.getElementById("email");
+    const form     = document.getElementById("loginForm");
+    const emailEl  = document.getElementById("email");
     const errorMsg = document.getElementById("errorMsg");
 
     form.addEventListener("submit", (e) => {
-      // Basic validation
-      if (!emailInput.value || !document.getElementById("pass").value) {
+      if (!emailEl.value || !document.getElementById("pass").value) {
         e.preventDefault();
         errorMsg.textContent = "Please fill in all fields.";
         errorMsg.style.display = "block";
         return;
       }
-      // Save email to localStorage before the form submits
-      localStorage.setItem("loggedInEmail", emailInput.value);
+      localStorage.setItem("loggedInEmail", emailEl.value);
     });
   </script>
+
 </body>
 </html>

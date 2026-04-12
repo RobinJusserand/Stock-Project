@@ -1,43 +1,236 @@
-<!Doctype HTML>
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — StockView</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   12px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-decoration: none;
+      color: var(--text);
+      margin-bottom: 2rem;
+      letter-spacing: -0.3px;
+    }
+    .brand span { color: var(--accent); }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.25rem 2rem;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .card h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .card .subtitle {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .beta-badge {
+      display: inline-block;
+      background: rgba(220, 38, 38, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .form-group { margin-bottom: 1.25rem; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.45rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); opacity: 0.6; }
+
+    .btn-submit {
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.8rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-submit:hover { background: var(--accent-h); transform: translateY(-1px); }
+
+    .btn-reset {
+      width: 100%;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.7rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      margin-top: 0.65rem;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .btn-reset:hover { color: var(--text); border-color: var(--muted); }
+
+    .error-msg {
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      color: #fca5a5;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+
+    .divider {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: 1.5rem 0 0;
+    }
+
+    .divider a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .divider a:hover { text-decoration: underline; }
+
+    .back-link {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--text); }
+  </style>
+</head>
 <body>
 
+  <a href="index.html" class="brand">Stock<span>View</span></a>
 
- <form action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/register" method="POST">
-  <div>
-    <label for="email">Email:</label>
-    <input type="email" id="email" name="email" required>
+  <div class="card">
+    <h1>Create account <span class="beta-badge">Beta</span></h1>
+    <p class="subtitle">Join StockView and unlock upcoming features</p>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <form id="registerForm" action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/register" method="POST">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required />
+      </div>
+
+      <div class="form-group">
+        <label for="pass">Password</label>
+        <input type="password" id="pass" name="password" placeholder="Create a password" required />
+      </div>
+
+      <button type="submit" class="btn-submit">Create Account</button>
+      <button type="reset" class="btn-reset">Clear form</button>
+    </form>
+
+    <div class="divider">
+      Already have an account? <a href="login.html">Log in</a>
+    </div>
   </div>
 
-  <br>
+  <a href="index.html" class="back-link">
+    <i class="fa fa-arrow-left"></i> Back to home
+  </a>
 
-  <div>
-    <label for="pass">password:</label>
-    <input type="password" id="pass" name="password" placeholder="Enter your password" maxlength="12" required>
-  </div>
+  <script>
+    const form     = document.getElementById("registerForm");
+    const errorMsg = document.getElementById("errorMsg");
 
-  <br>
+    form.addEventListener("submit", (e) => {
+      const email = document.getElementById("email").value;
+      const pass  = document.getElementById("pass").value;
 
-  <div>
-    <input type="reset" value="reset">
-  </div>
+      if (!email || !pass) {
+        e.preventDefault();
+        errorMsg.textContent = "Please fill in all fields.";
+        errorMsg.style.display = "block";
+        return;
+      }
 
-  <br>
-
-  <div>
-    <input type="submit" value="Register">
-  </div>
-
-  <br>
-    <a href="login.html">Already have an account? Log in</a>
-
-</form>
-<a href="index.html">
-  <button>Back to Home</button>
-</a>
-
-  
-
+      if (pass.length < 6) {
+        e.preventDefault();
+        errorMsg.textContent = "Password must be at least 6 characters.";
+        errorMsg.style.display = "block";
+        return;
+      }
+    });
+  </script>
 
 </body>
 </html>
