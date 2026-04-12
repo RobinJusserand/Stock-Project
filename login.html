@@ -3,44 +3,88 @@
 <head>
   <meta charset="UTF-8">
   <title>Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 400px;
+      margin: 60px auto;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    h1 { text-align: center; }
+    .form-box {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      width: 100%;
+      background-color: #4caf50;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover { background-color: #45a049; }
+    .links { margin-top: 15px; text-align: center; }
+    .links a { margin: 0 10px; color: #333; }
+    #errorMsg { color: red; text-align: center; margin-bottom: 10px; display: none; }
+  </style>
 </head>
 <body>
   <h1>Login</h1>
 
-  <form action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/login" method="POST">
-    <div>
-      <label for="email">Email:</label>
-      <input type="email" id="email" name="email" required>
+  <div class="form-box">
+    <p id="errorMsg"></p>
+    <form id="loginForm" action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/login" method="POST">
+      <div>
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+
+      <div>
+        <label for="pass">Password:</label>
+        <input type="password" id="pass" name="password" required placeholder="Enter your password">
+      </div>
+
+      <button type="submit">Login</button>
+    </form>
+
+    <div class="links">
+      <a href="Account.html">Don't have an account? Register</a>
+      &nbsp;|&nbsp;
+      <a href="index.html">Back to Home</a>
     </div>
+  </div>
 
-    <br>
-
-    <div>
-      <label for="pass">Password:</label>
-      <input type="password" id="pass" name="password" required maxlength="12">
-    </div>
-
-    <br>
-
-    <button type="submit">Login</button>
-  </form>
-
-  <br>
-  <a href="index.html">Don't have an account? Register</a>
-  <a href="index.html"></a>
-  <button onclick="window.location.href='index.html'">Back to Home</button>
-  
-  <!-- This script saves the email in localStorage on the GITHUB domain -->
   <script>
     const form = document.getElementById("loginForm");
     const emailInput = document.getElementById("email");
+    const errorMsg = document.getElementById("errorMsg");
 
-    form.addEventListener("submit", () => {
-      // Save email before leaving the page
+    form.addEventListener("submit", (e) => {
+      // Basic validation
+      if (!emailInput.value || !document.getElementById("pass").value) {
+        e.preventDefault();
+        errorMsg.textContent = "Please fill in all fields.";
+        errorMsg.style.display = "block";
+        return;
+      }
+      // Save email to localStorage before the form submits
       localStorage.setItem("loggedInEmail", emailInput.value);
     });
   </script>
-
-
 </body>
 </html>
