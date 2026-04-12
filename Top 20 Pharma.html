@@ -200,60 +200,69 @@
     let chartInstance = null;
     let activeSymbol  = null;
 
-    // ─── Fetch single stock with localStorage cache ────────────────────────
-    async function fetchStockData(symbol, forceRefresh = false) {
-      const cacheKey = `twelvedata_${symbol}`;
-
-      if (!forceRefresh) {
-        try {
-          const cached = localStorage.getItem(cacheKey);
-          if (cached) {
-            const { timestamp, values } = JSON.parse(cached);
-            if (Date.now() - timestamp < CACHE_TTL) {
-              return { symbol, name: companies.find(c => c.symbol === symbol)?.name, values, fromCache: true, cachedAt: timestamp };
-            }
-          }
-        } catch (_) { /* ignore corrupt cache */ }
-      }
-
-      const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=60&apikey=${API_KEY}`;
-      try {
-        const res  = await fetch(url);
-        const data = await res.json();
-
-        if (data.status === "error") {
-          return { symbol, name: companies.find(c => c.symbol === symbol)?.name, error: data.code === 429 ? 'rate_limit' : 'invalid', message: data.message };
-        }
-        if (!data.values || data.values.length === 0) {
-          return { symbol, error: 'no_data' };
-        }
-
-        // Save to cache
-        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), values: data.values }));
-
-        return { symbol, name: companies.find(c => c.symbol === symbol)?.name, values: data.values, fromCache: false };
-
-      } catch (err) {
-        return { symbol, name: companies.find(c => c.symbol === symbol)?.name, error: 'network' };
-      }
-    }
-
-    // ─── Load all stocks in parallel ──────────────────────────────────────
+    // ─── Load all stocks — batch fetch + per-symbol cache ─────────────────
     async function loadAllStocks(forceRefresh = false) {
       showLoader(true);
       clearMessages();
       document.getElementById('stockData').innerHTML = '';
 
-      const results = await Promise.all(companies.map(c => fetchStockData(c.symbol, forceRefresh)));
+      // Step 1: split companies into cached vs needs-fetching
+      const cachedResults = {};
+      const toFetch       = [];
+
+      for (const company of companies) {
+        const hit = !forceRefresh && getCached(company.symbol);
+        if (hit) {
+          cachedResults[company.symbol] = hit;
+        } else {
+          toFetch.push(company);
+        }
+      }
+
+      // Step 2: fetch all stale/missing symbols in ONE batch request
+      const freshResults = {};
+      if (toFetch.length > 0) {
+        const symbolList = toFetch.map(c => c.symbol).join(',');
+        const url = `https://api.twelvedata.com/time_series?symbol=${symbolList}&interval=1day&outputsize=60&apikey=${API_KEY}`;
+
+        try {
+          const res  = await fetch(url);
+          const data = await res.json();
+
+          for (const company of toFetch) {
+            const sym = company.symbol;
+            // When only 1 symbol is requested Twelve Data returns the data directly (no wrapper)
+            const entry = toFetch.length === 1 ? data : data[sym];
+
+            if (!entry || entry.status === 'error') {
+              const code = entry?.code;
+              freshResults[sym] = { symbol: sym, name: company.name, error: code === 429 ? 'rate_limit' : 'invalid' };
+            } else if (!entry.values || entry.values.length === 0) {
+              freshResults[sym] = { symbol: sym, name: company.name, error: 'no_data' };
+            } else {
+              // Save to cache
+              localStorage.setItem(`twelvedata_${sym}`, JSON.stringify({ timestamp: Date.now(), values: entry.values }));
+              freshResults[sym] = { symbol: sym, name: company.name, values: entry.values, fromCache: false };
+            }
+          }
+        } catch (err) {
+          for (const company of toFetch) {
+            freshResults[company.symbol] = { symbol: company.symbol, name: company.name, error: 'network' };
+          }
+        }
+      }
+
+      // Step 3: merge results in original company order
+      const results = companies.map(c => cachedResults[c.symbol] || freshResults[c.symbol] || { symbol: c.symbol, name: c.name, error: 'unknown' });
 
       showLoader(false);
       renderTable(results);
 
-      // Cache notice — if any came from cache show how old
-      const cachedResults = results.filter(r => r.fromCache);
-      if (cachedResults.length > 0) {
-        const mins = Math.round((Date.now() - cachedResults[0].cachedAt) / 60000);
-        showCacheNotice(`${cachedResults.length} of ${companies.length} stocks loaded from cache (${mins} min old). Click "Force Refresh" to fetch live data.`);
+      // Cache notice
+      const fromCacheList = results.filter(r => r.fromCache);
+      if (fromCacheList.length > 0) {
+        const mins = Math.round((Date.now() - fromCacheList[0].cachedAt) / 60000);
+        showCacheNotice(`${fromCacheList.length} of ${companies.length} stocks loaded from cache (${mins} min old). Click "Force Refresh" to fetch live data.`);
       }
 
       // Rate limit warning
@@ -349,9 +358,9 @@
 
       activeSymbol = symbol;
 
-      // Use already-fetched data from allResults if available, otherwise fetch fresh
+      // Use already-fetched data from allResults if available, then try cache, then skip
       let stock = allResults?.find(r => r.symbol === symbol && r.values);
-      if (!stock) stock = await fetchStockData(symbol);
+      if (!stock) stock = getCached(symbol);
       if (!stock || stock.error || !stock.values) return;
 
       const reversed = [...stock.values].reverse();
@@ -395,6 +404,19 @@
           }
         }
       });
+    }
+
+    // ─── Cache helper ──────────────────────────────────────────────────────
+    function getCached(symbol) {
+      try {
+        const raw = localStorage.getItem(`twelvedata_${symbol}`);
+        if (!raw) return null;
+        const { timestamp, values } = JSON.parse(raw);
+        if (Date.now() - timestamp < CACHE_TTL) {
+          return { symbol, name: companies.find(c => c.symbol === symbol)?.name, values, fromCache: true, cachedAt: timestamp };
+        }
+      } catch (_) {}
+      return null;
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────
