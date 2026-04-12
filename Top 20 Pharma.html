@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Stock Performance Tracker</title>
-
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -23,7 +21,7 @@
     }
 
     section {
-      max-width: 800px;
+      max-width: 900px;
       margin: 20px auto;
       background-color: white;
       padding: 20px;
@@ -34,11 +32,11 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
+      margin-top: 10px;
     }
 
     th, td {
-      padding: 12px;
+      padding: 11px 12px;
       text-align: center;
       border-bottom: 1px solid #ddd;
     }
@@ -46,10 +44,103 @@
     th {
       background-color: #333;
       color: white;
+      font-size: 0.9em;
     }
 
-    button {
+    tbody tr {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover {
+      background-color: #f0f7ff;
+    }
+
+    tbody tr.active-row {
+      background-color: #e3f2fd;
+      font-weight: bold;
+    }
+
+    .positive { color: #2e7d32; font-weight: bold; }
+    .negative { color: #c62828; font-weight: bold; }
+    .neutral  { color: #555; }
+
+    .changeDateRange {
+      font-size: 0.8em;
+      color: #aaa;
+      display: block;
+      margin-top: 2px;
+    }
+
+    /* Loading */
+    #loader {
+      text-align: center;
+      padding: 30px;
+      font-size: 16px;
+      color: #555;
+      display: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      border: 3px solid #ccc;
+      border-top-color: #333;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #errorBanner {
+      background: #fdecea;
+      border: 1px solid #f5c6cb;
+      color: #c62828;
+      padding: 10px 14px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    /* Chart section */
+    #chartSection h2 {
+      margin-bottom: 4px;
+    }
+
+    #chartSubtitle {
+      font-size: 0.85em;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    canvas {
+      width: 100%;
+    }
+
+    /* Buttons */
+    .btn {
       background-color: #4caf50;
+      color: white;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+    }
+
+    .btn:hover { background-color: #45a049; }
+
+    #homeButton {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background-color: #333;
       color: white;
       padding: 10px;
       border: none;
@@ -57,213 +148,302 @@
       cursor: pointer;
     }
 
-    #homeButton:hover,
-    button:hover {
-      background-color: #0056b3;
+    #homeButton:hover { background-color: #555; }
+
+    #refreshBtn {
+      background-color: #1976d2;
     }
 
-    .changeDateRange {
-      font-size: 0.9em;
-      color: gray;
+    #refreshBtn:hover { background-color: #1565c0; }
+
+    .tip {
+      font-size: 0.82em;
+      color: #888;
+      margin-top: 8px;
     }
   </style>
 </head>
 
 <body>
-
   <header>
     <h1>Stock Performance Tracker</h1>
   </header>
 
-  <section id="stockData">
-    <!-- Display stock information here -->
+  <section id="stockSection">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div>
+        <button class="btn" id="refreshBtn" onclick="loadAllStocks()">⟳ Refresh Data</button>
+        <button class="btn" onclick="window.location.href='index.html'">Home</button>
+      </div>
+    </div>
+
+    <div id="errorBanner"></div>
+    <div id="loader"><span class="spinner"></span> Loading all stocks in parallel…</div>
+
+    <div id="stockData"></div>
+    <p class="tip">Click any row to update the chart below.</p>
   </section>
 
-  <section id="stockEvolution">
-    <h2>Stock Evolution</h2>
+  <section id="chartSection">
+    <h2 id="chartTitle">Stock Evolution</h2>
+    <p id="chartSubtitle">Click a row above to view its price history.</p>
     <canvas id="stockChart"></canvas>
-    <button id="homeButton">Home</button>
   </section>
 
-  <!-- -------------------------------------------------- -->
-  <!--  YOUR ORIGINAL SCRIPT — UNMODIFIED, JUST FORMATTED -->
-  <!-- -------------------------------------------------- -->
+  <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
 
   <script>
-    const apiKey = 'D4UE1TIQ7VWSLRBN';
+    const API_KEY = 'D4UE1TIQ7VWSLRBN';
 
     const companies = [
-      { symbol: 'LLY', name: 'Eli Lilly' },
-      { symbol: 'NVO', name: 'Novo Nordisk' },
-      { symbol: 'JNJ', name: 'Johnson & Johnson' },
-      { symbol: 'MRK', name: 'Merck' },
-      { symbol: 'NVS', name: 'Novartis' },
-      { symbol: 'AZN', name: 'AstraZeneca' },
-      { symbol: 'PFE', name: 'Pfizer' },
-      { symbol: 'SNY', name: 'Sanofi' },
-      { symbol: 'BMY', name: 'Bristol-Myers Squibb' },
-      { symbol: 'NVDA', name: 'Nvidia' },
-      { symbol: 'TSLA', name: 'Tesla' },
-      { symbol: 'AAPL', name: 'Apple' },
+      { symbol: 'LLY',   name: 'Eli Lilly' },
+      { symbol: 'NVO',   name: 'Novo Nordisk' },
+      { symbol: 'JNJ',   name: 'Johnson & Johnson' },
+      { symbol: 'MRK',   name: 'Merck' },
+      { symbol: 'NVS',   name: 'Novartis' },
+      { symbol: 'AZN',   name: 'AstraZeneca' },
+      { symbol: 'PFE',   name: 'Pfizer' },
+      { symbol: 'SNY',   name: 'Sanofi' },
+      { symbol: 'BMY',   name: 'Bristol-Myers Squibb' },
+      { symbol: 'NVDA',  name: 'Nvidia' },
+      { symbol: 'TSLA',  name: 'Tesla' },
+      { symbol: 'AAPL',  name: 'Apple' },
       { symbol: 'MC.PA', name: 'LVMH' },
-      { symbol: 'MSFT', name: 'Microsoft' },
+      { symbol: 'MSFT',  name: 'Microsoft' },
     ];
 
-    let dailyRange = '';
-    let weeklyRange = '';
-    let monthlyRange = '';
+    // Stores all fetched data so chart updates don't re-fetch
+    const stockCache = {};
 
+    // Chart.js instance — stored so we can destroy before re-rendering
+    let chartInstance = null;
+
+    // Currently highlighted row
+    let activeSymbol = null;
+
+    // ─── Fetch a single stock ────────────────────────────────────────────────
     async function fetchStockData(symbol) {
-      const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${apiKey}`;
+      if (stockCache[symbol]) return stockCache[symbol];   // use cache if available
 
+      const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`;
       try {
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+        const res  = await fetch(url);
+        const data = await res.json();
 
-        if (data['Time Series (Daily)']) {
-          return {
-            symbol,
-            name: companies.find(company => company.symbol === symbol).name,
-            data: data['Time Series (Daily)'],
-          };
-        } else {
-          console.error('Error fetching stock data:', data);
-          return null;
+        if (data['Note']) {
+          return { symbol, error: 'rate_limit' };
         }
-      } catch (error) {
-        console.error('Error fetching stock data:', error);
-        return null;
+        if (data['Error Message'] || !data['Time Series (Daily)']) {
+          return { symbol, error: 'invalid' };
+        }
+
+        const result = {
+          symbol,
+          name: companies.find(c => c.symbol === symbol)?.name || symbol,
+          timeSeries: data['Time Series (Daily)'],
+        };
+        stockCache[symbol] = result;
+        return result;
+
+      } catch (err) {
+        console.error(`Fetch failed for ${symbol}:`, err);
+        return { symbol, error: 'network' };
       }
     }
 
-    function formatDate(dateString) {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric"
-      });
+    // ─── Load all stocks in PARALLEL ─────────────────────────────────────────
+    async function loadAllStocks() {
+      showLoader(true);
+      clearError();
+      document.getElementById('stockData').innerHTML = '';
+
+      // Fetch all 14 stocks at the same time
+      const results = await Promise.all(companies.map(c => fetchStockData(c.symbol)));
+
+      showLoader(false);
+      renderTable(results);
+
+      // Auto-show first successful result in chart
+      const first = results.find(r => !r.error);
+      if (first) showEvolution(first.symbol);
     }
 
-    async function updateStockData() {
-      const stockDataSection = document.getElementById('stockData');
+    // ─── Render the table ─────────────────────────────────────────────────────
+    function renderTable(results) {
+      let dateRangeSet = false;
+      let dailyRange = '', weeklyRange = '', monthlyRange = '';
 
-      stockDataSection.innerHTML = `
+      // Compute date ranges from the first valid result
+      const firstValid = results.find(r => !r.error);
+      if (firstValid) {
+        const dates = Object.keys(firstValid.timeSeries);
+        dailyRange   = `${fmtDate(dates[1])} → ${fmtDate(dates[0])}`;
+        weeklyRange  = `${fmtDate(dates[Math.min(5,  dates.length-1)])} → ${fmtDate(dates[0])}`;
+        monthlyRange = `${fmtDate(dates[Math.min(21, dates.length-1)])} → ${fmtDate(dates[0])}`;
+      }
+
+      let rateLimitWarning = results.some(r => r.error === 'rate_limit');
+      if (rateLimitWarning) {
+        showError('API rate limit hit for one or more stocks. Some rows may show "No data". Wait 1 minute and click Refresh.');
+      }
+
+      const html = `
         <table id="stockTable">
           <thead>
             <tr>
               <th>Company</th>
-              <th>Current Price</th>
-              <th>Daily Change <span class="changeDateRange" id="dailyRange"></span></th>
-              <th>Weekly Change <span class="changeDateRange" id="weeklyRange"></span></th>
-              <th>Monthly Change <span class="changeDateRange" id="monthlyRange"></span></th>
+              <th>Price</th>
+              <th>Daily Change <span class="changeDateRange">${dailyRange}</span></th>
+              <th>Weekly Change <span class="changeDateRange">${weeklyRange}</span></th>
+              <th>Monthly Change <span class="changeDateRange">${monthlyRange}</span></th>
             </tr>
           </thead>
-          <tbody></tbody>
+          <tbody>
+            ${results.map(r => buildRow(r)).join('')}
+          </tbody>
         </table>
       `;
 
-      const stockTableBody = document.querySelector('#stockTable tbody');
+      document.getElementById('stockData').innerHTML = html;
 
-      for (const company of companies) {
-        const stockData = await fetchStockData(company.symbol);
-
-        if (stockData && stockData.data) {
-          const dates = Object.keys(stockData.data);
-
-          const latestDate = dates[0];
-          const latestPrice = parseFloat(stockData.data[latestDate]['4. close']).toFixed(2);
-
-          // Daily
-          const previousDate = dates[1];
-          const previousClose = parseFloat(stockData.data[previousDate]['4. close']).toFixed(2);
-          const dailyChange = (latestPrice - previousClose).toFixed(2);
-          const dailyChangePercentage =
-            (((latestPrice - previousClose) / previousClose) * 100).toFixed(2);
-
-          // Weekly
-          const weekAgoDate = dates[5];
-          const weekAgoPrice = parseFloat(stockData.data[weekAgoDate]['4. close']).toFixed(2);
-          const weeklyChange = (latestPrice - weekAgoPrice).toFixed(2);
-          const weeklyChangePercentage =
-            (((latestPrice - weekAgoPrice) / weekAgoPrice) * 100).toFixed(2);
-
-          // Monthly
-          const monthAgoDate = dates[21];
-          const monthAgoPrice = parseFloat(stockData.data[monthAgoDate]['4. close']).toFixed(2);
-          const monthlyChange = (latestPrice - monthAgoPrice).toFixed(2);
-          const monthlyChangePercentage =
-            (((latestPrice - monthAgoPrice) / monthAgoPrice) * 100).toFixed(2);
-
-          // Date ranges
-          if (!dailyRange) {
-            dailyRange =
-              `From ${formatDate(previousDate)} to ${formatDate(latestDate)}`;
-            weeklyRange =
-              `From ${formatDate(weekAgoDate)} to ${formatDate(latestDate)}`;
-            monthlyRange =
-              `From ${formatDate(monthAgoDate)} to ${formatDate(latestDate)}`;
-
-            document.getElementById('dailyRange').innerText = dailyRange;
-            document.getElementById('weeklyRange').innerText = weeklyRange;
-            document.getElementById('monthlyRange').innerText = monthlyRange;
-          }
-
-          const stockRow = document.createElement('tr');
-          stockRow.innerHTML = `
-            <td>${stockData.name} (${stockData.symbol})</td>
-            <td>$${latestPrice}</td>
-            <td>$${dailyChange} (${dailyChangePercentage}%)</td>
-            <td>$${weeklyChange} (${weeklyChangePercentage}%)</td>
-            <td>$${monthlyChange} (${monthlyChangePercentage}%)</td>
-          `;
-
-          stockTableBody.appendChild(stockRow);
-
-        } else {
-          const stockRow = document.createElement('tr');
-          stockRow.innerHTML =
-            `<td colspan="5">${company.name} (${company.symbol}): No data available</td>`;
-          stockTableBody.appendChild(stockRow);
-        }
-      }
-    }
-
-    async function showEvolution(symbol) {
-      const chartCanvas = document.getElementById('stockChart');
-      const ctx = chartCanvas.getContext('2d');
-
-      const stockData = await fetchStockData(symbol);
-
-      if (stockData) {
-        const dates = Object.keys(stockData.data);
-        const prices = dates.map(
-          date => parseFloat(stockData.data[date]['4. close'])
-        ).reverse();
-
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: dates.reverse(),
-            datasets: [{
-              label: `${stockData.name} (${symbol}) Stock Price`,
-              borderColor: 'rgba(75, 192, 192, 1)',
-              data: prices,
-              fill: false,
-            }],
-          },
+      // Wire up row clicks to update chart
+      document.querySelectorAll('#stockTable tbody tr[data-symbol]').forEach(row => {
+        row.addEventListener('click', () => {
+          showEvolution(row.dataset.symbol);
         });
-      }
+      });
     }
 
-    document.getElementById('homeButton').addEventListener('click', () => {
-      window.location.href = 'index.html';
-    });
+    function buildRow(stock) {
+      if (stock.error) {
+        const msg = stock.error === 'rate_limit'
+          ? 'Rate limit — refresh in 1 min'
+          : stock.error === 'invalid'
+            ? 'Symbol not found'
+            : 'Network error';
+        return `<tr><td colspan="5" style="color:#aaa;">${stock.symbol}: ${msg}</td></tr>`;
+      }
 
-    window.onload = function () {
-      updateStockData();
-      showEvolution('MRK');
-    };
+      const dates = Object.keys(stock.timeSeries);
+      const latest = parseFloat(stock.timeSeries[dates[0]]['4. close']);
+      const prev   = parseFloat(stock.timeSeries[dates[1]]['4. close']);
+      const week   = parseFloat(stock.timeSeries[dates[Math.min(5,  dates.length-1)]]['4. close']);
+      const month  = parseFloat(stock.timeSeries[dates[Math.min(21, dates.length-1)]]['4. close']);
+
+      const dChg = latest - prev;
+      const wChg = latest - week;
+      const mChg = latest - month;
+
+      return `
+        <tr data-symbol="${stock.symbol}" title="Click to view chart">
+          <td style="text-align:left;"><strong>${stock.name}</strong> <span style="color:#888;font-size:0.85em;">${stock.symbol}</span></td>
+          <td>$${latest.toFixed(2)}</td>
+          <td class="${colorClass(dChg)}">${arrow(dChg)}$${Math.abs(dChg).toFixed(2)} (${pct(dChg, prev)}%)</td>
+          <td class="${colorClass(wChg)}">${arrow(wChg)}$${Math.abs(wChg).toFixed(2)} (${pct(wChg, week)}%)</td>
+          <td class="${colorClass(mChg)}">${arrow(mChg)}$${Math.abs(mChg).toFixed(2)} (${pct(mChg, month)}%)</td>
+        </tr>
+      `;
+    }
+
+    // ─── Chart ────────────────────────────────────────────────────────────────
+    async function showEvolution(symbol) {
+      // Update active row highlight
+      document.querySelectorAll('#stockTable tbody tr').forEach(r => r.classList.remove('active-row'));
+      const activeRow = document.querySelector(`tr[data-symbol="${symbol}"]`);
+      if (activeRow) activeRow.classList.add('active-row');
+
+      activeSymbol = symbol;
+
+      // Fetch (uses cache if already loaded)
+      const stock = await fetchStockData(symbol);
+      if (!stock || stock.error) return;
+
+      const dates  = Object.keys(stock.timeSeries).slice(0, 60).reverse();
+      const prices = dates.map(d => parseFloat(stock.timeSeries[d]['4. close']));
+
+      // Destroy old chart before creating new one
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+
+      document.getElementById('chartTitle').textContent = `${stock.name} (${symbol}) — Last 60 Trading Days`;
+      document.getElementById('chartSubtitle').textContent = '';
+
+      const ctx = document.getElementById('stockChart').getContext('2d');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: `${symbol} Closing Price`,
+            data: prices,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.08)',
+            borderWidth: 2,
+            pointRadius: 2,
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
+            y: { ticks: { callback: (v) => `$${v.toFixed(0)}` } }
+          }
+        }
+      });
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+    function colorClass(change) {
+      if (change > 0) return 'positive';
+      if (change < 0) return 'negative';
+      return 'neutral';
+    }
+
+    function arrow(change) {
+      if (change > 0) return '▲ ';
+      if (change < 0) return '▼ ';
+      return '';
+    }
+
+    function pct(change, base) {
+      return ((change / base) * 100).toFixed(2);
+    }
+
+    function fmtDate(dateString) {
+      return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function showLoader(show) {
+      document.getElementById('loader').style.display = show ? 'block' : 'none';
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorBanner');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function clearError() {
+      const el = document.getElementById('errorBanner');
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+
+    // ─── Init ─────────────────────────────────────────────────────────────────
+    window.onload = loadAllStocks;
   </script>
 
 </body>
