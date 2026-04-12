@@ -12,50 +12,40 @@
       padding: 0;
       background-color: #f4f4f4;
     }
-
     header {
       background-color: #333;
       color: white;
       text-align: center;
       padding: 1em;
     }
-
     section {
-      max-width: 900px;
+      max-width: 960px;
       margin: 20px auto;
       background-color: white;
       padding: 20px;
       border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
     }
-
     th, td {
       padding: 11px 12px;
       text-align: center;
       border-bottom: 1px solid #ddd;
     }
-
     th {
       background-color: #333;
       color: white;
       font-size: 0.9em;
     }
-
     tbody tr {
       cursor: pointer;
       transition: background 0.15s;
     }
-
-    tbody tr:hover {
-      background-color: #f0f7ff;
-    }
-
+    tbody tr:hover { background-color: #f0f7ff; }
     tbody tr.active-row {
       background-color: #e3f2fd;
       font-weight: bold;
@@ -70,9 +60,9 @@
       color: #aaa;
       display: block;
       margin-top: 2px;
+      font-weight: normal;
     }
 
-    /* Loading */
     #loader {
       text-align: center;
       padding: 30px;
@@ -80,7 +70,6 @@
       color: #555;
       display: none;
     }
-
     .spinner {
       display: inline-block;
       width: 22px;
@@ -92,10 +81,7 @@
       vertical-align: middle;
       margin-right: 8px;
     }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     #errorBanner {
       background: #fdecea;
@@ -106,23 +92,17 @@
       margin-bottom: 10px;
       display: none;
     }
-
-    /* Chart section */
-    #chartSection h2 {
-      margin-bottom: 4px;
-    }
-
-    #chartSubtitle {
+    #cacheNotice {
+      background: #e8f4fd;
+      border: 1px solid #b3d9f7;
+      color: #1565c0;
+      padding: 8px 14px;
+      border-radius: 4px;
+      margin-bottom: 10px;
       font-size: 0.85em;
-      color: #888;
-      margin-bottom: 12px;
+      display: none;
     }
 
-    canvas {
-      width: 100%;
-    }
-
-    /* Buttons */
     .btn {
       background-color: #4caf50;
       color: white;
@@ -133,8 +113,9 @@
       font-size: 14px;
       margin-right: 8px;
     }
-
     .btn:hover { background-color: #45a049; }
+    .btn-blue { background-color: #1976d2; }
+    .btn-blue:hover { background-color: #1565c0; }
 
     #homeButton {
       position: fixed;
@@ -147,20 +128,21 @@
       border-radius: 5px;
       cursor: pointer;
     }
-
     #homeButton:hover { background-color: #555; }
-
-    #refreshBtn {
-      background-color: #1976d2;
-    }
-
-    #refreshBtn:hover { background-color: #1565c0; }
 
     .tip {
       font-size: 0.82em;
       color: #888;
       margin-top: 8px;
     }
+
+    #chartSection h2 { margin-bottom: 4px; }
+    #chartSubtitle {
+      font-size: 0.85em;
+      color: #888;
+      margin-bottom: 12px;
+    }
+    canvas { width: 100%; }
   </style>
 </head>
 
@@ -170,13 +152,15 @@
   </header>
 
   <section id="stockSection">
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
       <div>
-        <button class="btn" id="refreshBtn" onclick="loadAllStocks()">⟳ Refresh Data</button>
+        <button class="btn btn-blue" onclick="loadAllStocks(false)">⟳ Refresh</button>
+        <button class="btn btn-blue" onclick="loadAllStocks(true)">↺ Force Refresh (bypass cache)</button>
         <button class="btn" onclick="window.location.href='index.html'">Home</button>
       </div>
     </div>
 
+    <div id="cacheNotice"></div>
     <div id="errorBanner"></div>
     <div id="loader"><span class="spinner"></span> Loading all stocks in parallel…</div>
 
@@ -193,7 +177,8 @@
   <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
 
   <script>
-    const API_KEY = 'D4UE1TIQ7VWSLRBN';
+    const API_KEY   = "019effbed54c4b939010eb1072ff71bc";
+    const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
     const companies = [
       { symbol: 'LLY',   name: 'Eli Lilly' },
@@ -212,82 +197,90 @@
       { symbol: 'MSFT',  name: 'Microsoft' },
     ];
 
-    // Stores all fetched data so chart updates don't re-fetch
-    const stockCache = {};
-
-    // Chart.js instance — stored so we can destroy before re-rendering
     let chartInstance = null;
+    let activeSymbol  = null;
 
-    // Currently highlighted row
-    let activeSymbol = null;
+    // ─── Fetch single stock with localStorage cache ────────────────────────
+    async function fetchStockData(symbol, forceRefresh = false) {
+      const cacheKey = `twelvedata_${symbol}`;
 
-    // ─── Fetch a single stock ────────────────────────────────────────────────
-    async function fetchStockData(symbol) {
-      if (stockCache[symbol]) return stockCache[symbol];   // use cache if available
+      if (!forceRefresh) {
+        try {
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            const { timestamp, values } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_TTL) {
+              return { symbol, name: companies.find(c => c.symbol === symbol)?.name, values, fromCache: true, cachedAt: timestamp };
+            }
+          }
+        } catch (_) { /* ignore corrupt cache */ }
+      }
 
-      const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`;
+      const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=60&apikey=${API_KEY}`;
       try {
         const res  = await fetch(url);
         const data = await res.json();
 
-        if (data['Note']) {
-          return { symbol, error: 'rate_limit' };
+        if (data.status === "error") {
+          return { symbol, name: companies.find(c => c.symbol === symbol)?.name, error: data.code === 429 ? 'rate_limit' : 'invalid', message: data.message };
         }
-        if (data['Error Message'] || !data['Time Series (Daily)']) {
-          return { symbol, error: 'invalid' };
+        if (!data.values || data.values.length === 0) {
+          return { symbol, error: 'no_data' };
         }
 
-        const result = {
-          symbol,
-          name: companies.find(c => c.symbol === symbol)?.name || symbol,
-          timeSeries: data['Time Series (Daily)'],
-        };
-        stockCache[symbol] = result;
-        return result;
+        // Save to cache
+        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+
+        return { symbol, name: companies.find(c => c.symbol === symbol)?.name, values: data.values, fromCache: false };
 
       } catch (err) {
-        console.error(`Fetch failed for ${symbol}:`, err);
-        return { symbol, error: 'network' };
+        return { symbol, name: companies.find(c => c.symbol === symbol)?.name, error: 'network' };
       }
     }
 
-    // ─── Load all stocks in PARALLEL ─────────────────────────────────────────
-    async function loadAllStocks() {
+    // ─── Load all stocks in parallel ──────────────────────────────────────
+    async function loadAllStocks(forceRefresh = false) {
       showLoader(true);
-      clearError();
+      clearMessages();
       document.getElementById('stockData').innerHTML = '';
 
-      // Fetch all 14 stocks at the same time
-      const results = await Promise.all(companies.map(c => fetchStockData(c.symbol)));
+      const results = await Promise.all(companies.map(c => fetchStockData(c.symbol, forceRefresh)));
 
       showLoader(false);
       renderTable(results);
 
-      // Auto-show first successful result in chart
-      const first = results.find(r => !r.error);
-      if (first) showEvolution(first.symbol);
+      // Cache notice — if any came from cache show how old
+      const cachedResults = results.filter(r => r.fromCache);
+      if (cachedResults.length > 0) {
+        const mins = Math.round((Date.now() - cachedResults[0].cachedAt) / 60000);
+        showCacheNotice(`${cachedResults.length} of ${companies.length} stocks loaded from cache (${mins} min old). Click "Force Refresh" to fetch live data.`);
+      }
+
+      // Rate limit warning
+      if (results.some(r => r.error === 'rate_limit')) {
+        showError('API rate limit hit for one or more stocks. Wait a moment and click Refresh.');
+      }
+
+      // Auto-show first valid result in chart
+      const first = results.find(r => r.values);
+      if (first) showEvolution(first.symbol, results);
     }
 
-    // ─── Render the table ─────────────────────────────────────────────────────
+    // ─── Build and render table ────────────────────────────────────────────
     function renderTable(results) {
-      let dateRangeSet = false;
+      const firstValid = results.find(r => r.values && r.values.length > 1);
       let dailyRange = '', weeklyRange = '', monthlyRange = '';
 
-      // Compute date ranges from the first valid result
-      const firstValid = results.find(r => !r.error);
       if (firstValid) {
-        const dates = Object.keys(firstValid.timeSeries);
-        dailyRange   = `${fmtDate(dates[1])} → ${fmtDate(dates[0])}`;
-        weeklyRange  = `${fmtDate(dates[Math.min(5,  dates.length-1)])} → ${fmtDate(dates[0])}`;
-        monthlyRange = `${fmtDate(dates[Math.min(21, dates.length-1)])} → ${fmtDate(dates[0])}`;
+        const v = firstValid.values;
+        dailyRange   = `${v[1].datetime} → ${v[0].datetime}`;
+        weeklyRange  = `${v[Math.min(5,  v.length-1)].datetime} → ${v[0].datetime}`;
+        monthlyRange = `${v[Math.min(21, v.length-1)].datetime} → ${v[0].datetime}`;
       }
 
-      let rateLimitWarning = results.some(r => r.error === 'rate_limit');
-      if (rateLimitWarning) {
-        showError('API rate limit hit for one or more stocks. Some rows may show "No data". Wait 1 minute and click Refresh.');
-      }
+      const rows = results.map(r => buildRow(r)).join('');
 
-      const html = `
+      document.getElementById('stockData').innerHTML = `
         <table id="stockTable">
           <thead>
             <tr>
@@ -298,84 +291,87 @@
               <th>Monthly Change <span class="changeDateRange">${monthlyRange}</span></th>
             </tr>
           </thead>
-          <tbody>
-            ${results.map(r => buildRow(r)).join('')}
-          </tbody>
+          <tbody>${rows}</tbody>
         </table>
       `;
 
-      document.getElementById('stockData').innerHTML = html;
-
-      // Wire up row clicks to update chart
+      // Wire up row clicks — pass all results so chart can use cached values
       document.querySelectorAll('#stockTable tbody tr[data-symbol]').forEach(row => {
-        row.addEventListener('click', () => {
-          showEvolution(row.dataset.symbol);
-        });
+        row.addEventListener('click', () => showEvolution(row.dataset.symbol, results));
       });
     }
 
     function buildRow(stock) {
       if (stock.error) {
-        const msg = stock.error === 'rate_limit'
-          ? 'Rate limit — refresh in 1 min'
-          : stock.error === 'invalid'
-            ? 'Symbol not found'
-            : 'Network error';
-        return `<tr><td colspan="5" style="color:#aaa;">${stock.symbol}: ${msg}</td></tr>`;
+        const msg = {
+          rate_limit: 'Rate limit — click Refresh in 1 min',
+          invalid:    'Symbol not found',
+          no_data:    'No data available',
+          network:    'Network error',
+        }[stock.error] || 'Error';
+        return `<tr><td colspan="5" style="color:#aaa;text-align:left;padding-left:12px;">${stock.symbol}: ${msg}</td></tr>`;
       }
 
-      const dates = Object.keys(stock.timeSeries);
-      const latest = parseFloat(stock.timeSeries[dates[0]]['4. close']);
-      const prev   = parseFloat(stock.timeSeries[dates[1]]['4. close']);
-      const week   = parseFloat(stock.timeSeries[dates[Math.min(5,  dates.length-1)]]['4. close']);
-      const month  = parseFloat(stock.timeSeries[dates[Math.min(21, dates.length-1)]]['4. close']);
+      const v      = stock.values;
+      const latest = parseFloat(v[0].close);
+      const prev   = parseFloat(v[1].close);
+      const week   = parseFloat(v[Math.min(5,  v.length-1)].close);
+      const month  = parseFloat(v[Math.min(21, v.length-1)].close);
 
       const dChg = latest - prev;
       const wChg = latest - week;
       const mChg = latest - month;
 
+      const fmt = (n) => Math.abs(n).toFixed(2);
+      const pct = (chg, base) => Math.abs((chg / base) * 100).toFixed(2);
+      const arr = (n) => n > 0 ? '▲ ' : n < 0 ? '▼ ' : '';
+
       return `
         <tr data-symbol="${stock.symbol}" title="Click to view chart">
-          <td style="text-align:left;"><strong>${stock.name}</strong> <span style="color:#888;font-size:0.85em;">${stock.symbol}</span></td>
+          <td style="text-align:left;">
+            <strong>${stock.name}</strong>
+            <span style="color:#888;font-size:0.85em;margin-left:4px;">${stock.symbol}</span>
+          </td>
           <td>$${latest.toFixed(2)}</td>
-          <td class="${colorClass(dChg)}">${arrow(dChg)}$${Math.abs(dChg).toFixed(2)} (${pct(dChg, prev)}%)</td>
-          <td class="${colorClass(wChg)}">${arrow(wChg)}$${Math.abs(wChg).toFixed(2)} (${pct(wChg, week)}%)</td>
-          <td class="${colorClass(mChg)}">${arrow(mChg)}$${Math.abs(mChg).toFixed(2)} (${pct(mChg, month)}%)</td>
+          <td class="${colorClass(dChg)}">${arr(dChg)}$${fmt(dChg)} (${pct(dChg, prev)}%)</td>
+          <td class="${colorClass(wChg)}">${arr(wChg)}$${fmt(wChg)} (${pct(wChg, week)}%)</td>
+          <td class="${colorClass(mChg)}">${arr(mChg)}$${fmt(mChg)} (${pct(mChg, month)}%)</td>
         </tr>
       `;
     }
 
-    // ─── Chart ────────────────────────────────────────────────────────────────
-    async function showEvolution(symbol) {
-      // Update active row highlight
+    // ─── Chart ─────────────────────────────────────────────────────────────
+    async function showEvolution(symbol, allResults) {
+      // Highlight active row
       document.querySelectorAll('#stockTable tbody tr').forEach(r => r.classList.remove('active-row'));
-      const activeRow = document.querySelector(`tr[data-symbol="${symbol}"]`);
-      if (activeRow) activeRow.classList.add('active-row');
+      const row = document.querySelector(`tr[data-symbol="${symbol}"]`);
+      if (row) row.classList.add('active-row');
 
       activeSymbol = symbol;
 
-      // Fetch (uses cache if already loaded)
-      const stock = await fetchStockData(symbol);
-      if (!stock || stock.error) return;
+      // Use already-fetched data from allResults if available, otherwise fetch fresh
+      let stock = allResults?.find(r => r.symbol === symbol && r.values);
+      if (!stock) stock = await fetchStockData(symbol);
+      if (!stock || stock.error || !stock.values) return;
 
-      const dates  = Object.keys(stock.timeSeries).slice(0, 60).reverse();
-      const prices = dates.map(d => parseFloat(stock.timeSeries[d]['4. close']));
+      const reversed = [...stock.values].reverse();
+      const labels   = reversed.map(v => v.datetime);
+      const prices   = reversed.map(v => parseFloat(v.close));
 
-      // Destroy old chart before creating new one
+      // Destroy old chart
       if (chartInstance) {
         chartInstance.destroy();
         chartInstance = null;
       }
 
-      document.getElementById('chartTitle').textContent = `${stock.name} (${symbol}) — Last 60 Trading Days`;
+      document.getElementById('chartTitle').textContent    = `${stock.name} (${symbol}) — Last ${stock.values.length} Trading Days`;
       document.getElementById('chartSubtitle').textContent = '';
 
       const ctx = document.getElementById('stockChart').getContext('2d');
-
       chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: dates,
+          labels,
           datasets: [{
             label: `${symbol} Closing Price`,
             data: prices,
@@ -391,11 +387,7 @@
           responsive: true,
           plugins: {
             legend: { display: true },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}`
-              }
-            }
+            tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
           },
           scales: {
             x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
@@ -405,45 +397,29 @@
       });
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-    function colorClass(change) {
-      if (change > 0) return 'positive';
-      if (change < 0) return 'negative';
-      return 'neutral';
-    }
-
-    function arrow(change) {
-      if (change > 0) return '▲ ';
-      if (change < 0) return '▼ ';
-      return '';
-    }
-
-    function pct(change, base) {
-      return ((change / base) * 100).toFixed(2);
-    }
-
-    function fmtDate(dateString) {
-      return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
+    // ─── Helpers ───────────────────────────────────────────────────────────
+    function colorClass(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
 
     function showLoader(show) {
       document.getElementById('loader').style.display = show ? 'block' : 'none';
     }
-
     function showError(msg) {
       const el = document.getElementById('errorBanner');
       el.textContent = msg;
       el.style.display = 'block';
     }
-
-    function clearError() {
-      const el = document.getElementById('errorBanner');
-      el.textContent = '';
-      el.style.display = 'none';
+    function showCacheNotice(msg) {
+      const el = document.getElementById('cacheNotice');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function clearMessages() {
+      document.getElementById('errorBanner').style.display = 'none';
+      document.getElementById('cacheNotice').style.display = 'none';
     }
 
-    // ─── Init ─────────────────────────────────────────────────────────────────
-    window.onload = loadAllStocks;
+    // ─── Init ──────────────────────────────────────────────────────────────
+    window.onload = () => loadAllStocks(false);
   </script>
 
 </body>

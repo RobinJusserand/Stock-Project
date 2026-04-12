@@ -12,29 +12,25 @@
       padding: 0;
       background-color: #f4f4f4;
     }
-
     header {
       background-color: #333;
       color: white;
       text-align: center;
       padding: 1em;
     }
-
     section {
       max-width: 800px;
       margin: 20px auto;
       background-color: white;
       padding: 20px;
       border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-
     label {
       display: block;
       margin-bottom: 5px;
       font-weight: bold;
     }
-
     input {
       width: 100%;
       padding: 8px;
@@ -43,7 +39,6 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
-
     button {
       background-color: #4caf50;
       color: white;
@@ -53,15 +48,9 @@
       cursor: pointer;
       font-size: 15px;
     }
+    button:hover { background-color: #45a049; }
 
-    button:hover {
-      background-color: #45a049;
-    }
-
-    #stockData {
-      margin-top: 20px;
-    }
-
+    #stockData { margin-top: 20px; }
     #stockData p {
       margin: 10px 0;
       font-size: 16px;
@@ -74,10 +63,7 @@
     .negative { color: #c62828; font-weight: bold; }
     .neutral  { color: #555; }
 
-    canvas {
-      width: 100%;
-      margin-top: 20px;
-    }
+    canvas { width: 100%; margin-top: 20px; }
 
     #homeButton {
       position: fixed;
@@ -90,12 +76,8 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    #homeButton:hover { background-color: #555; }
 
-    #homeButton:hover {
-      background-color: #555;
-    }
-
-    /* Loading spinner */
     #loader {
       display: none;
       text-align: center;
@@ -103,7 +85,6 @@
       font-size: 16px;
       color: #555;
     }
-
     .spinner {
       display: inline-block;
       width: 20px;
@@ -115,10 +96,7 @@
       vertical-align: middle;
       margin-right: 8px;
     }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     #errorMsg {
       color: #c62828;
@@ -129,6 +107,13 @@
       display: none;
       margin-top: 10px;
     }
+
+    #cacheNotice {
+      font-size: 0.82em;
+      color: #888;
+      margin-top: 6px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -138,13 +123,15 @@
 </header>
 
 <section id="stockSelection">
-  <form id="stockForm" onsubmit="event.preventDefault(); getStockData();">
+  <form id="stockForm" onsubmit="event.preventDefault(); getStockData(false);">
     <label for="stockSymbol">Enter Stock Symbol (e.g. AAPL, TSLA, MSFT):</label>
     <input type="text" id="stockSymbol" placeholder="e.g. AAPL" required />
     <button type="submit">Get Data</button>
+    <button type="button" onclick="getStockData(true)" style="background:#1976d2; margin-left:8px;">Force Refresh</button>
   </form>
   <div id="loader"><span class="spinner"></span> Fetching stock data…</div>
   <div id="errorMsg"></div>
+  <div id="cacheNotice"></div>
 </section>
 
 <section id="stockData">
@@ -159,123 +146,140 @@
 <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
 
 <script>
-  const API_KEY = "S5KUD067OHAEXVLM";
-  let chartInstance = null;
+  const API_KEY     = "019effbed54c4b939010eb1072ff71bc";
+  const CACHE_TTL   = 60 * 60 * 1000; // 1 hour in ms
+  let   chartInstance = null;
 
-  async function getStockData() {
-    const symbolRaw = document.getElementById("stockSymbol").value.trim().toUpperCase();
-
-    if (!symbolRaw) return;
+  // ─── Main entry point ────────────────────────────────────────────────────
+  async function getStockData(forceRefresh = false) {
+    const symbol = document.getElementById("stockSymbol").value.trim().toUpperCase();
+    if (!symbol) return;
 
     showLoader(true);
     clearError();
     document.getElementById("stockData").innerHTML = "";
     document.getElementById("chartSection").style.display = "none";
-
-    const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbolRaw}&apikey=${API_KEY}`;
+    document.getElementById("cacheNotice").style.display = "none";
 
     try {
-      const response = await fetch(apiUrl);
-      const data = await response.json();
+      const { values, fromCache, cachedAt } = await fetchWithCache(symbol, forceRefresh);
+      updateStockData(values, symbol);
+      renderChart(values, symbol);
 
-      // Handle API-level errors
-      if (data["Note"]) {
-        showError("API rate limit reached. Please wait a minute and try again.");
-        return;
+      if (fromCache) {
+        const mins = Math.round((Date.now() - cachedAt) / 60000);
+        showCacheNotice(`Showing cached data from ${mins} minute${mins !== 1 ? 's' : ''} ago. Click "Force Refresh" for live data.`);
       }
-      if (data["Error Message"]) {
-        showError(`Could not find data for symbol "${symbolRaw}". Please check the ticker and try again.`);
-        return;
-      }
-      if (!data["Time Series (Daily)"]) {
-        showError("No data returned. The symbol may be invalid or the API is temporarily unavailable.");
-        return;
-      }
-
-      updateStockData(data, symbolRaw);
-      renderChart(data, symbolRaw);
-
-    } catch (error) {
-      showError("Network error — could not fetch stock data. Please check your connection and try again.");
-      console.error("Fetch error:", error);
+    } catch (err) {
+      showError(err.message);
     } finally {
       showLoader(false);
     }
   }
 
-  function updateStockData(data, symbol) {
-    const timeSeries = data["Time Series (Daily)"];
-    const dates = Object.keys(timeSeries);
+  // ─── Fetch with localStorage cache ───────────────────────────────────────
+  async function fetchWithCache(symbol, forceRefresh) {
+    const cacheKey = `twelvedata_${symbol}`;
 
-    // Guard against missing data points
-    if (dates.length < 2) {
+    if (!forceRefresh) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { timestamp, values } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_TTL) {
+          return { values, fromCache: true, cachedAt: timestamp };
+        }
+      }
+    }
+
+    // Live fetch
+    const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=60&apikey=${API_KEY}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    // Handle Twelve Data errors
+    if (data.status === "error") {
+      if (data.code === 429) throw new Error("API rate limit reached. Please wait a moment and try again.");
+      if (data.code === 400) throw new Error(`Symbol "${symbol}" not found. Please check the ticker and try again.`);
+      throw new Error(data.message || "Unknown API error.");
+    }
+    if (!data.values || data.values.length === 0) {
+      throw new Error("No data returned. The symbol may be invalid or delisted.");
+    }
+
+    // Save to cache
+    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+
+    return { values: data.values, fromCache: false };
+  }
+
+  // ─── Render metrics ───────────────────────────────────────────────────────
+  // Twelve Data returns values[] newest-first:
+  // values[0] = today, values[1] = yesterday, values[5] = ~1 week ago, values[21] = ~1 month ago
+  function updateStockData(values, symbol) {
+    if (values.length < 2) {
       showError("Not enough data available for this stock.");
       return;
     }
 
-    const latestDate    = dates[0];
-    const previousDate  = dates[1];
-    const weekAgoDate   = dates[Math.min(5, dates.length - 1)];
-    const monthAgoDate  = dates[Math.min(21, dates.length - 1)];
+    const latest  = parseFloat(values[0].close);
+    const prev    = parseFloat(values[1].close);
+    const weekVal = parseFloat(values[Math.min(5,  values.length - 1)].close);
+    const monVal  = parseFloat(values[Math.min(21, values.length - 1)].close);
 
-    const latestClose   = parseFloat(timeSeries[latestDate]["4. close"]);
-    const previousClose = parseFloat(timeSeries[previousDate]["4. close"]);
-    const weekAgoClose  = parseFloat(timeSeries[weekAgoDate]["4. close"]);
-    const monthAgoClose = parseFloat(timeSeries[monthAgoDate]["4. close"]);
+    const latestDate = values[0].datetime;
+    const prevDate   = values[1].datetime;
+    const weekDate   = values[Math.min(5,  values.length - 1)].datetime;
+    const monDate    = values[Math.min(21, values.length - 1)].datetime;
 
-    const dailyChange   = latestClose - previousClose;
-    const weekChange    = latestClose - weekAgoClose;
-    const monthChange   = latestClose - monthAgoClose;
+    const dChg = latest - prev;
+    const wChg = latest - weekVal;
+    const mChg = latest - monVal;
 
-    const fmt = (n) => n.toFixed(2);
-    const pct = (change, base) => ((change / base) * 100).toFixed(2);
+    const fmt = (n) => Math.abs(n).toFixed(2);
+    const pct = (chg, base) => ((chg / base) * 100).toFixed(2);
+    const sgn = (n) => n >= 0 ? '+' : '-';
 
     document.getElementById("stockData").innerHTML = `
       <h2 style="margin-bottom:12px;">${symbol}</h2>
-      <p><strong>Latest Closing Price:</strong> $${fmt(latestClose)}</p>
+      <p><strong>Latest Closing Price:</strong> $${latest.toFixed(2)} <span style="color:#aaa;font-size:0.85em;">(${latestDate})</span></p>
       <p>
         <strong>Daily Change</strong>
-        <span style="font-size:0.85em;color:gray;">(${formatDate(previousDate)} → ${formatDate(latestDate)})</span>:
-        <span class="${colorClass(dailyChange)}">
-          ${dailyChange >= 0 ? '+' : ''}$${fmt(dailyChange)} (${pct(dailyChange, previousClose)}%)
-        </span>
+        <span style="font-size:0.85em;color:gray;">(${prevDate} → ${latestDate})</span>:
+        <span class="${colorClass(dChg)}">${sgn(dChg)}$${fmt(dChg)} (${pct(dChg, prev)}%)</span>
       </p>
       <p>
         <strong>Weekly Change</strong>
-        <span style="font-size:0.85em;color:gray;">(${formatDate(weekAgoDate)} → ${formatDate(latestDate)})</span>:
-        <span class="${colorClass(weekChange)}">
-          ${weekChange >= 0 ? '+' : ''}$${fmt(weekChange)} (${pct(weekChange, weekAgoClose)}%)
-        </span>
+        <span style="font-size:0.85em;color:gray;">(${weekDate} → ${latestDate})</span>:
+        <span class="${colorClass(wChg)}">${sgn(wChg)}$${fmt(wChg)} (${pct(wChg, weekVal)}%)</span>
       </p>
       <p>
         <strong>Monthly Change</strong>
-        <span style="font-size:0.85em;color:gray;">(${formatDate(monthAgoDate)} → ${formatDate(latestDate)})</span>:
-        <span class="${colorClass(monthChange)}">
-          ${monthChange >= 0 ? '+' : ''}$${fmt(monthChange)} (${pct(monthChange, monthAgoClose)}%)
-        </span>
+        <span style="font-size:0.85em;color:gray;">(${monDate} → ${latestDate})</span>:
+        <span class="${colorClass(mChg)}">${sgn(mChg)}$${fmt(mChg)} (${pct(mChg, monVal)}%)</span>
       </p>
     `;
   }
 
-  function renderChart(data, symbol) {
-    const timeSeries = data["Time Series (Daily)"];
-    const dates  = Object.keys(timeSeries).slice(0, 60).reverse();
-    const prices = dates.map(d => parseFloat(timeSeries[d]["4. close"]));
+  // ─── Chart ─────────────────────────────────────────────────────────────────
+  function renderChart(values, symbol) {
+    // Reverse so chart goes oldest → newest (left to right)
+    const reversed = [...values].reverse();
+    const labels = reversed.map(v => v.datetime);
+    const prices = reversed.map(v => parseFloat(v.close));
 
-    // Destroy previous chart instance before creating a new one
     if (chartInstance) {
       chartInstance.destroy();
       chartInstance = null;
     }
 
-    const ctx = document.getElementById("stockChart").getContext("2d");
-    document.getElementById("chartTitle").textContent = `${symbol} — Last 60 Trading Days`;
+    document.getElementById("chartTitle").textContent = `${symbol} — Last ${values.length} Trading Days`;
     document.getElementById("chartSection").style.display = "block";
 
+    const ctx = document.getElementById("stockChart").getContext("2d");
     chartInstance = new Chart(ctx, {
       type: "line",
       data: {
-        labels: dates,
+        labels,
         datasets: [{
           label: `${symbol} Closing Price`,
           data: prices,
@@ -291,53 +295,37 @@
         responsive: true,
         plugins: {
           legend: { display: true },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}`
-            }
-          }
+          tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
         },
         scales: {
-          x: {
-            ticks: { maxTicksLimit: 10, maxRotation: 30 }
-          },
-          y: {
-            ticks: {
-              callback: (val) => `$${val.toFixed(0)}`
-            }
-          }
+          x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
+          y: { ticks: { callback: (v) => `$${v.toFixed(0)}` } }
         }
       }
     });
   }
 
-  // --- Helpers ---
-
-  function colorClass(change) {
-    if (change > 0) return "positive";
-    if (change < 0) return "negative";
-    return "neutral";
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  function colorClass(n) {
+    return n > 0 ? "positive" : n < 0 ? "negative" : "neutral";
   }
-
-  function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-  }
-
   function showLoader(show) {
     document.getElementById("loader").style.display = show ? "block" : "none";
   }
-
   function showError(msg) {
     const el = document.getElementById("errorMsg");
     el.textContent = msg;
     el.style.display = "block";
   }
-
   function clearError() {
     const el = document.getElementById("errorMsg");
     el.textContent = "";
     el.style.display = "none";
+  }
+  function showCacheNotice(msg) {
+    const el = document.getElementById("cacheNotice");
+    el.textContent = msg;
+    el.style.display = "block";
   }
 </script>
 
