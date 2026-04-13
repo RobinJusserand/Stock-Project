@@ -6,91 +6,132 @@
   <title>Stock Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   10px;
+    }
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f4f4f4;
+      background-color: var(--bg);
+      color: var(--text);
     }
+
     header {
-      background-color: #333;
-      color: white;
+      background-color: var(--surface);
+      color: var(--text);
       text-align: center;
-      padding: 1em;
+      padding: 1.25em;
+      border-bottom: 1px solid var(--border);
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
+
     section {
       max-width: 800px;
       margin: 20px auto;
-      background-color: white;
+      background-color: var(--surface);
       padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
     }
+
     label {
       display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
     }
+
     input {
       width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      box-sizing: border-box;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
     }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); opacity: 0.6; }
+
     button {
-      background-color: #4caf50;
+      background-color: var(--accent);
       color: white;
       padding: 10px 20px;
       border: none;
-      border-radius: 5px;
+      border-radius: 7px;
       cursor: pointer;
-      font-size: 15px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.15s;
     }
-    button:hover { background-color: #45a049; }
+    button:hover { background-color: var(--accent-h); transform: translateY(-1px); }
 
     #stockData { margin-top: 20px; }
     #stockData p {
-      margin: 10px 0;
-      font-size: 16px;
-      padding: 8px 12px;
-      border-radius: 4px;
-      background: #f9f9f9;
+      margin: 8px 0;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
     }
 
-    .positive { color: #2e7d32; font-weight: bold; }
-    .negative { color: #c62828; font-weight: bold; }
-    .neutral  { color: #555; }
+    .positive { color: #4ade80; font-weight: bold; }
+    .negative { color: #f87171; font-weight: bold; }
+    .neutral  { color: var(--muted); }
 
     canvas { width: 100%; margin-top: 20px; }
 
     #homeButton {
       position: fixed;
-      top: 10px;
-      left: 10px;
-      background-color: #333;
-      color: white;
-      padding: 10px;
-      border: none;
-      border-radius: 5px;
+      top: 12px;
+      left: 12px;
+      background-color: var(--surface);
+      color: var(--text);
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
       cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: border-color 0.2s, color 0.2s;
     }
-    #homeButton:hover { background-color: #555; }
+    #homeButton:hover { border-color: var(--accent); color: var(--accent); }
 
     #loader {
       display: none;
       text-align: center;
       padding: 20px;
       font-size: 16px;
-      color: #555;
+      color: var(--muted);
     }
+
     .spinner {
       display: inline-block;
       width: 20px;
       height: 20px;
-      border: 3px solid #ccc;
-      border-top-color: #333;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       vertical-align: middle;
@@ -99,19 +140,23 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     #errorMsg {
-      color: #c62828;
-      background: #fdecea;
-      border: 1px solid #f5c6cb;
+      color: #fca5a5;
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.3);
       padding: 10px 14px;
-      border-radius: 4px;
+      border-radius: 8px;
       display: none;
       margin-top: 10px;
     }
 
     #cacheNotice {
       font-size: 0.82em;
-      color: #888;
-      margin-top: 6px;
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 8px 14px;
+      border-radius: 8px;
+      margin-top: 8px;
       display: none;
     }
   </style>
@@ -127,7 +172,7 @@
     <label for="stockSymbol">Enter Stock Symbol (e.g. AAPL, TSLA, MSFT):</label>
     <input type="text" id="stockSymbol" placeholder="e.g. AAPL" required />
     <button type="submit">Get Data</button>
-    <button type="button" onclick="getStockData(true)" style="background:#1976d2; margin-left:8px;">Force Refresh</button>
+    <button type="button" onclick="getStockData(true)" style="background:var(--surface2);border:1px solid var(--border);margin-left:8px;">Force Refresh</button>
   </form>
   <div id="loader"><span class="spinner"></span> Fetching stock data…</div>
   <div id="errorMsg"></div>
@@ -283,8 +328,8 @@
         datasets: [{
           label: `${symbol} Closing Price`,
           data: prices,
-          borderColor: "rgba(75, 192, 192, 1)",
-          backgroundColor: "rgba(75, 192, 192, 0.1)",
+          borderColor: "rgba(220, 38, 38, 0.9)",
+          backgroundColor: "rgba(220, 38, 38, 0.08)",
           borderWidth: 2,
           pointRadius: 2,
           fill: true,
@@ -298,8 +343,14 @@
           tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
         },
         scales: {
-          x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
-          y: { ticks: { callback: (v) => `$${v.toFixed(0)}` } }
+          x: {
+            ticks: { maxTicksLimit: 10, maxRotation: 30, color: '#94a3b8' },
+            grid: { color: 'rgba(51, 65, 85, 0.6)' }
+          },
+          y: {
+            ticks: { callback: (v) => `$${v.toFixed(0)}`, color: '#94a3b8' },
+            grid: { color: 'rgba(51, 65, 85, 0.6)' }
+          }
         }
       }
     });

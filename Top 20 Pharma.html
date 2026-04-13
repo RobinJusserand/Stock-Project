@@ -6,76 +6,108 @@
   <title>Stock Performance Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   10px;
+    }
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f4f4f4;
+      background-color: var(--bg);
+      color: var(--text);
     }
+
     header {
-      background-color: #333;
-      color: white;
+      background-color: var(--surface);
+      color: var(--text);
       text-align: center;
-      padding: 1em;
+      padding: 1.25em;
+      border-bottom: 1px solid var(--border);
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
+
     section {
       max-width: 960px;
       margin: 20px auto;
-      background-color: white;
+      background-color: var(--surface);
       padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
     }
+
     th, td {
       padding: 11px 12px;
       text-align: center;
-      border-bottom: 1px solid #ddd;
+      border-bottom: 1px solid var(--border);
     }
+
     th {
-      background-color: #333;
-      color: white;
-      font-size: 0.9em;
+      background-color: var(--surface2);
+      color: var(--muted);
+      font-size: 0.85em;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
+
     tbody tr {
       cursor: pointer;
       transition: background 0.15s;
     }
-    tbody tr:hover { background-color: #f0f7ff; }
+
+    tbody tr:hover { background-color: rgba(220, 38, 38, 0.07); }
     tbody tr.active-row {
-      background-color: #e3f2fd;
+      background-color: rgba(220, 38, 38, 0.12);
+      border-left: 3px solid var(--accent);
       font-weight: bold;
     }
 
-    .positive { color: #2e7d32; font-weight: bold; }
-    .negative { color: #c62828; font-weight: bold; }
-    .neutral  { color: #555; }
+    .positive { color: #4ade80; font-weight: bold; }
+    .negative { color: #f87171; font-weight: bold; }
+    .neutral  { color: var(--muted); }
 
     .changeDateRange {
-      font-size: 0.8em;
-      color: #aaa;
+      font-size: 0.78em;
+      color: var(--muted);
       display: block;
       margin-top: 2px;
       font-weight: normal;
+      opacity: 0.7;
     }
 
     #loader {
       text-align: center;
       padding: 30px;
       font-size: 16px;
-      color: #555;
+      color: var(--muted);
       display: none;
     }
+
     .spinner {
       display: inline-block;
       width: 22px;
       height: 22px;
-      border: 3px solid #ccc;
-      border-top-color: #333;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       vertical-align: middle;
@@ -84,64 +116,76 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     #errorBanner {
-      background: #fdecea;
-      border: 1px solid #f5c6cb;
-      color: #c62828;
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      color: #fca5a5;
       padding: 10px 14px;
-      border-radius: 4px;
+      border-radius: 8px;
       margin-bottom: 10px;
       display: none;
     }
+
     #cacheNotice {
-      background: #e8f4fd;
-      border: 1px solid #b3d9f7;
-      color: #1565c0;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
       padding: 8px 14px;
-      border-radius: 4px;
+      border-radius: 8px;
       margin-bottom: 10px;
       font-size: 0.85em;
       display: none;
     }
 
     .btn {
-      background-color: #4caf50;
+      background-color: var(--accent);
       color: white;
       padding: 9px 18px;
       border: none;
-      border-radius: 5px;
+      border-radius: 7px;
       cursor: pointer;
       font-size: 14px;
+      font-weight: 600;
       margin-right: 8px;
+      transition: background 0.2s, transform 0.15s;
     }
-    .btn:hover { background-color: #45a049; }
-    .btn-blue { background-color: #1976d2; }
-    .btn-blue:hover { background-color: #1565c0; }
+    .btn:hover { background-color: var(--accent-h); transform: translateY(-1px); }
+
+    .btn-blue {
+      background-color: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-blue:hover { background-color: var(--border); }
 
     #homeButton {
       position: fixed;
-      top: 10px;
-      left: 10px;
-      background-color: #333;
-      color: white;
-      padding: 10px;
-      border: none;
-      border-radius: 5px;
+      top: 12px;
+      left: 12px;
+      background-color: var(--surface);
+      color: var(--text);
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
       cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: border-color 0.2s;
     }
-    #homeButton:hover { background-color: #555; }
+    #homeButton:hover { border-color: var(--accent); color: var(--accent); }
 
     .tip {
       font-size: 0.82em;
-      color: #888;
+      color: var(--muted);
       margin-top: 8px;
     }
 
-    #chartSection h2 { margin-bottom: 4px; }
+    #chartSection h2 { margin-bottom: 4px; color: var(--text); }
     #chartSubtitle {
       font-size: 0.85em;
-      color: #888;
+      color: var(--muted);
       margin-bottom: 12px;
     }
+
     canvas { width: 100%; }
   </style>
 </head>
@@ -318,7 +362,7 @@
           no_data:    'No data available',
           network:    'Network error',
         }[stock.error] || 'Error';
-        return `<tr><td colspan="5" style="color:#aaa;text-align:left;padding-left:12px;">${stock.symbol}: ${msg}</td></tr>`;
+        return `<tr><td colspan="5" style="color:var(--muted);text-align:left;padding-left:12px;">${stock.symbol}: ${msg}</td></tr>`;
       }
 
       const v      = stock.values;
@@ -339,7 +383,7 @@
         <tr data-symbol="${stock.symbol}" title="Click to view chart">
           <td style="text-align:left;">
             <strong>${stock.name}</strong>
-            <span style="color:#888;font-size:0.85em;margin-left:4px;">${stock.symbol}</span>
+            <span style="color:var(--muted);font-size:0.85em;margin-left:4px;">${stock.symbol}</span>
           </td>
           <td>$${latest.toFixed(2)}</td>
           <td class="${colorClass(dChg)}">${arr(dChg)}$${fmt(dChg)} (${pct(dChg, prev)}%)</td>
@@ -384,8 +428,8 @@
           datasets: [{
             label: `${symbol} Closing Price`,
             data: prices,
-            borderColor: 'rgba(75, 192, 192, 1)',
-            backgroundColor: 'rgba(75, 192, 192, 0.08)',
+            borderColor: 'rgba(220, 38, 38, 0.9)',
+            backgroundColor: 'rgba(220, 38, 38, 0.08)',
             borderWidth: 2,
             pointRadius: 2,
             fill: true,
@@ -399,8 +443,14 @@
             tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
           },
           scales: {
-            x: { ticks: { maxTicksLimit: 10, maxRotation: 30 } },
-            y: { ticks: { callback: (v) => `$${v.toFixed(0)}` } }
+            x: {
+              ticks: { maxTicksLimit: 10, maxRotation: 30, color: '#94a3b8' },
+              grid: { color: 'rgba(51, 65, 85, 0.6)' }
+            },
+            y: {
+              ticks: { callback: (v) => `$${v.toFixed(0)}`, color: '#94a3b8' },
+              grid: { color: 'rgba(51, 65, 85, 0.6)' }
+            }
           }
         }
       });
