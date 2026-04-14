@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --bg:       #0f172a;
       --surface:  #1e293b;
@@ -19,7 +18,6 @@
       --border:   #334155;
       --radius:   12px;
     }
-
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background-color: var(--bg);
@@ -31,17 +29,14 @@
       justify-content: center;
       padding: 2rem 1rem;
     }
-
     .brand {
       font-size: 1.5rem;
       font-weight: 800;
       text-decoration: none;
       color: var(--text);
       margin-bottom: 2rem;
-      letter-spacing: -0.3px;
     }
     .brand span { color: var(--accent); }
-
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -50,24 +45,13 @@
       width: 100%;
       max-width: 420px;
     }
-
-    .card h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-    }
-
-    .card .subtitle {
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-bottom: 2rem;
-    }
-
+    .card h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .card .subtitle { font-size: 0.9rem; color: var(--muted); margin-bottom: 2rem; }
     .beta-badge {
       display: inline-block;
-      background: rgba(220, 38, 38, 0.15);
+      background: rgba(220,38,38,0.15);
       color: var(--accent);
-      border: 1px solid rgba(220, 38, 38, 0.3);
+      border: 1px solid rgba(220,38,38,0.3);
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 0.08em;
@@ -77,9 +61,7 @@
       margin-left: 0.5rem;
       vertical-align: middle;
     }
-
     .form-group { margin-bottom: 1.25rem; }
-
     label {
       display: block;
       font-size: 0.85rem;
@@ -89,10 +71,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-
-    input[type="email"],
-    input[type="password"],
-    input[type="text"] {
+    input[type="email"], input[type="password"] {
       width: 100%;
       background: var(--bg);
       border: 1px solid var(--border);
@@ -103,10 +82,8 @@
       outline: none;
       transition: border-color 0.2s;
     }
-
     input:focus { border-color: var(--accent); }
     input::placeholder { color: var(--muted); opacity: 0.6; }
-
     .btn-submit {
       width: 100%;
       background: var(--accent);
@@ -121,24 +98,10 @@
       transition: background 0.2s, transform 0.15s;
     }
     .btn-submit:hover { background: var(--accent-h); transform: translateY(-1px); }
-
-    .btn-reset {
-      width: 100%;
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.7rem;
-      font-size: 0.9rem;
-      cursor: pointer;
-      margin-top: 0.65rem;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .btn-reset:hover { color: var(--text); border-color: var(--muted); }
-
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .error-msg {
-      background: rgba(220, 38, 38, 0.1);
-      border: 1px solid rgba(220, 38, 38, 0.3);
+      background: rgba(220,38,38,0.1);
+      border: 1px solid rgba(220,38,38,0.3);
       color: #fca5a5;
       padding: 0.65rem 1rem;
       border-radius: 8px;
@@ -146,21 +109,19 @@
       margin-bottom: 1.25rem;
       display: none;
     }
-
-    .divider {
-      text-align: center;
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin: 1.5rem 0 0;
+    .success-msg {
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.3);
+      color: #4ade80;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+      display: none;
     }
-
-    .divider a {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 600;
-    }
+    .divider { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 1.5rem 0 0; }
+    .divider a { color: var(--accent); text-decoration: none; font-weight: 600; }
     .divider a:hover { text-decoration: underline; }
-
     .back-link {
       margin-top: 1.5rem;
       font-size: 0.85rem;
@@ -183,21 +144,19 @@
     <p class="subtitle">Join StockView and unlock upcoming features</p>
 
     <div class="error-msg" id="errorMsg"></div>
+    <div class="success-msg" id="successMsg"></div>
 
-    <form id="registerForm" action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/register" method="POST">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="you@example.com" required />
-      </div>
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@example.com" required />
+    </div>
 
-      <div class="form-group">
-        <label for="pass">Password</label>
-        <input type="password" id="pass" name="password" placeholder="Create a password" required />
-      </div>
+    <div class="form-group">
+      <label for="pass">Password</label>
+      <input type="password" id="pass" placeholder="At least 6 characters" required />
+    </div>
 
-      <button type="submit" class="btn-submit">Create Account</button>
-      <button type="reset" class="btn-reset">Clear form</button>
-    </form>
+    <button class="btn-submit" id="registerBtn" onclick="register()">Create Account</button>
 
     <div class="divider">
       Already have an account? <a href="login.html">Log in</a>
@@ -208,28 +167,77 @@
     <i class="fa fa-arrow-left"></i> Back to home
   </a>
 
-  <script>
-    const form     = document.getElementById("registerForm");
-    const errorMsg = document.getElementById("errorMsg");
+  <script type="module">
+    import { initializeApp }                from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-    form.addEventListener("submit", (e) => {
-      const email = document.getElementById("email").value;
-      const pass  = document.getElementById("pass").value;
+    const firebaseConfig = {
+      apiKey:            "AIzaSyBLf_Pooc_64xVv9P9typnp0GilbhIb5Zw",
+      authDomain:        "stockproject-a8dd8.firebaseapp.com",
+      projectId:         "stockproject-a8dd8",
+      storageBucket:     "stockproject-a8dd8.firebasestorage.app",
+      messagingSenderId: "682770169508",
+      appId:             "1:682770169508:web:b70bcfe161685331123031"
+    };
 
-      if (!email || !pass) {
-        e.preventDefault();
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    window.register = async function () {
+      const email    = document.getElementById("email").value.trim();
+      const password = document.getElementById("pass").value;
+      const btn      = document.getElementById("registerBtn");
+      const errorMsg = document.getElementById("errorMsg");
+      const successMsg = document.getElementById("successMsg");
+
+      errorMsg.style.display   = "none";
+      successMsg.style.display = "none";
+
+      if (!email || !password) {
         errorMsg.textContent = "Please fill in all fields.";
         errorMsg.style.display = "block";
         return;
       }
-
-      if (pass.length < 6) {
-        e.preventDefault();
+      if (password.length < 6) {
         errorMsg.textContent = "Password must be at least 6 characters.";
         errorMsg.style.display = "block";
         return;
       }
-    });
+
+      btn.disabled    = true;
+      btn.textContent = "Creating account…";
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Create user document in Firestore
+        await setDoc(doc(db, "users", user.uid), {
+          email:     email,
+          watchlist: [],
+          createdAt: serverTimestamp()
+        });
+
+        localStorage.setItem("loggedInEmail", email);
+        successMsg.textContent = "Account created! Redirecting…";
+        successMsg.style.display = "block";
+
+        setTimeout(() => window.location.href = "index.html", 1500);
+
+      } catch (err) {
+        const messages = {
+          "auth/email-already-in-use": "An account with this email already exists.",
+          "auth/invalid-email":        "Please enter a valid email address.",
+          "auth/weak-password":        "Password is too weak. Use at least 6 characters.",
+        };
+        errorMsg.textContent    = messages[err.code] || "Something went wrong. Please try again.";
+        errorMsg.style.display  = "block";
+        btn.disabled            = false;
+        btn.textContent         = "Create Account";
+      }
+    };
   </script>
 
 </body>

@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --bg:       #0f172a;
       --surface:  #1e293b;
@@ -19,7 +18,6 @@
       --border:   #334155;
       --radius:   12px;
     }
-
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background-color: var(--bg);
@@ -31,17 +29,14 @@
       justify-content: center;
       padding: 2rem 1rem;
     }
-
     .brand {
       font-size: 1.5rem;
       font-weight: 800;
       text-decoration: none;
       color: var(--text);
       margin-bottom: 2rem;
-      letter-spacing: -0.3px;
     }
     .brand span { color: var(--accent); }
-
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -50,21 +45,9 @@
       width: 100%;
       max-width: 420px;
     }
-
-    .card h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-    }
-
-    .card .subtitle {
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-bottom: 2rem;
-    }
-
+    .card h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .card .subtitle { font-size: 0.9rem; color: var(--muted); margin-bottom: 2rem; }
     .form-group { margin-bottom: 1.25rem; }
-
     label {
       display: block;
       font-size: 0.85rem;
@@ -74,10 +57,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-
-    input[type="email"],
-    input[type="password"],
-    input[type="text"] {
+    input[type="email"], input[type="password"] {
       width: 100%;
       background: var(--bg);
       border: 1px solid var(--border);
@@ -88,10 +68,8 @@
       outline: none;
       transition: border-color 0.2s;
     }
-
     input:focus { border-color: var(--accent); }
     input::placeholder { color: var(--muted); opacity: 0.6; }
-
     .btn-submit {
       width: 100%;
       background: var(--accent);
@@ -106,10 +84,10 @@
       transition: background 0.2s, transform 0.15s;
     }
     .btn-submit:hover { background: var(--accent-h); transform: translateY(-1px); }
-
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .error-msg {
-      background: rgba(220, 38, 38, 0.1);
-      border: 1px solid rgba(220, 38, 38, 0.3);
+      background: rgba(220,38,38,0.1);
+      border: 1px solid rgba(220,38,38,0.3);
       color: #fca5a5;
       padding: 0.65rem 1rem;
       border-radius: 8px;
@@ -117,21 +95,9 @@
       margin-bottom: 1.25rem;
       display: none;
     }
-
-    .divider {
-      text-align: center;
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin: 1.5rem 0 0;
-    }
-
-    .divider a {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 600;
-    }
+    .divider { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 1.5rem 0 0; }
+    .divider a { color: var(--accent); text-decoration: none; font-weight: 600; }
     .divider a:hover { text-decoration: underline; }
-
     .back-link {
       margin-top: 1.5rem;
       font-size: 0.85rem;
@@ -155,19 +121,17 @@
 
     <div class="error-msg" id="errorMsg"></div>
 
-    <form id="loginForm" action="https://b8252048-42bb-463f-a7f8-bf4f6a0e5dfd-00-nmaopvevszfs.riker.replit.dev/login" method="POST">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="you@example.com" required />
-      </div>
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@example.com" required />
+    </div>
 
-      <div class="form-group">
-        <label for="pass">Password</label>
-        <input type="password" id="pass" name="password" placeholder="Enter your password" required />
-      </div>
+    <div class="form-group">
+      <label for="pass">Password</label>
+      <input type="password" id="pass" placeholder="Enter your password" required />
+    </div>
 
-      <button type="submit" class="btn-submit">Log In</button>
-    </form>
+    <button class="btn-submit" id="loginBtn" onclick="login()">Log In</button>
 
     <div class="divider">
       Don't have an account? <a href="Account.html">Sign up</a>
@@ -178,19 +142,63 @@
     <i class="fa fa-arrow-left"></i> Back to home
   </a>
 
-  <script>
-    const form     = document.getElementById("loginForm");
-    const emailEl  = document.getElementById("email");
-    const errorMsg = document.getElementById("errorMsg");
+  <script type="module">
+    import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword }    from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
-    form.addEventListener("submit", (e) => {
-      if (!emailEl.value || !document.getElementById("pass").value) {
-        e.preventDefault();
-        errorMsg.textContent = "Please fill in all fields.";
+    const firebaseConfig = {
+      apiKey:            "AIzaSyBLf_Pooc_64xVv9P9typnp0GilbhIb5Zw",
+      authDomain:        "stockproject-a8dd8.firebaseapp.com",
+      projectId:         "stockproject-a8dd8",
+      storageBucket:     "stockproject-a8dd8.firebasestorage.app",
+      messagingSenderId: "682770169508",
+      appId:             "1:682770169508:web:b70bcfe161685331123031"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    window.login = async function () {
+      const email    = document.getElementById("email").value.trim();
+      const password = document.getElementById("pass").value;
+      const btn      = document.getElementById("loginBtn");
+      const errorMsg = document.getElementById("errorMsg");
+
+      errorMsg.style.display = "none";
+
+      if (!email || !password) {
+        errorMsg.textContent   = "Please fill in all fields.";
         errorMsg.style.display = "block";
         return;
       }
-      localStorage.setItem("loggedInEmail", emailEl.value);
+
+      btn.disabled    = true;
+      btn.textContent = "Logging in…";
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        localStorage.setItem("loggedInEmail", userCredential.user.email);
+        localStorage.setItem("loggedInUID",   userCredential.user.uid);
+        window.location.href = "index.html";
+
+      } catch (err) {
+        const messages = {
+          "auth/invalid-email":          "Please enter a valid email address.",
+          "auth/user-not-found":         "No account found with this email.",
+          "auth/wrong-password":         "Incorrect password. Please try again.",
+          "auth/invalid-credential":     "Incorrect email or password.",
+          "auth/too-many-requests":      "Too many failed attempts. Please try again later.",
+        };
+        errorMsg.textContent    = messages[err.code] || "Login failed. Please try again.";
+        errorMsg.style.display  = "block";
+        btn.disabled            = false;
+        btn.textContent         = "Log In";
+      }
+    };
+
+    // Allow pressing Enter to submit
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") window.login();
     });
   </script>
 

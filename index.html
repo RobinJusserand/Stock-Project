@@ -432,7 +432,7 @@
         <li><a href="#tools">Tools</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#contact">Contact</a></li>
-        <li><a href="Account.html" class="btn-nav">Sign Up</a></li>
+        <li><a href="Account.html" class="btn-nav" id="signupBtn">Sign Up</a></li>
         <li><span id="authStatus"></span></li>
       </ul>
       <button class="nav-toggle" onclick="toggleMenu()" aria-label="Menu">
@@ -572,32 +572,59 @@
     </div>
   </footer>
 
-  <script>
-    // ── Auth status in navbar ──
-    const email = localStorage.getItem("loggedInEmail");
-    const authEl = document.getElementById("authStatus");
+  <script type="module">
+    import { initializeApp }                from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 
-    if (email) {
-      authEl.innerHTML = `
-        <span style="color:var(--muted);font-size:0.85rem;">
-          ${email.split('@')[0]} · <a href="#" id="logoutLink" style="color:var(--accent);">Logout</a>
-        </span>`;
-      document.getElementById("logoutLink").addEventListener("click", (e) => {
-        e.preventDefault();
-        localStorage.removeItem("loggedInEmail");
-        window.location.reload();
-      });
-    } else {
-      authEl.innerHTML = `<a href="login.html" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Login</a>`;
-    }
+    const firebaseConfig = {
+      apiKey:            "AIzaSyBLf_Pooc_64xVv9P9typnp0GilbhIb5Zw",
+      authDomain:        "stockproject-a8dd8.firebaseapp.com",
+      projectId:         "stockproject-a8dd8",
+      storageBucket:     "stockproject-a8dd8.firebasestorage.app",
+      messagingSenderId: "682770169508",
+      appId:             "1:682770169508:web:b70bcfe161685331123031"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // ── Auth state listener ──
+    onAuthStateChanged(auth, (user) => {
+      const authEl    = document.getElementById("authStatus");
+      const signupBtn = document.getElementById("signupBtn");
+
+      if (user) {
+        // Logged in — show username + logout
+        const name = user.email.split("@")[0];
+        authEl.innerHTML = `
+          <span style="color:var(--muted);font-size:0.85rem;">
+            Hi, <strong style="color:var(--text);">${name}</strong> ·
+            <a href="#" id="logoutLink" style="color:var(--accent);text-decoration:none;">Logout</a>
+          </span>`;
+        document.getElementById("logoutLink").addEventListener("click", async (e) => {
+          e.preventDefault();
+          await signOut(auth);
+          localStorage.removeItem("loggedInEmail");
+          localStorage.removeItem("loggedInUID");
+          window.location.reload();
+        });
+        // Hide Sign Up button when logged in
+        if (signupBtn) signupBtn.style.display = "none";
+
+      } else {
+        // Logged out — show login link
+        authEl.innerHTML = `<a href="login.html" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Login</a>`;
+        if (signupBtn) signupBtn.style.display = "";
+      }
+    });
 
     // ── Mobile menu ──
-    function toggleMenu() {
+    window.toggleMenu = function() {
       document.getElementById("mobileMenu").classList.toggle("open");
-    }
-    function closeMenu() {
+    };
+    window.closeMenu = function() {
       document.getElementById("mobileMenu").classList.remove("open");
-    }
+    };
   </script>
 
 </body>
