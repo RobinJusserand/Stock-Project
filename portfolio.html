@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Portfolio — StockView</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   10px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(15,23,42,0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      height: 64px;
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+    }
+    .nav-inner {
+      max-width: 1000px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; color: var(--text); text-decoration: none; }
+    .nav-logo span { color: var(--accent); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .nav-right a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-right a:hover { color: var(--text); }
+
+    /* ── Main layout ── */
+    .page {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 90px 2rem 3rem;
+    }
+
+    /* ── Page header ── */
+    .page-header {
+      margin-bottom: 2rem;
+    }
+    .page-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+    .portfolio-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    #portfolioNameDisplay {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .edit-name-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.3rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .edit-name-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* Name edit inline */
+    #nameEditRow {
+      display: none;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+    #nameInput {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      width: 260px;
+    }
+    .btn-save-name {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 7px;
+      padding: 0.5rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-save-name:hover { background: var(--accent-h); }
+    .btn-cancel-name {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    /* ── Add stock form ── */
+    .add-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .add-section h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+    .add-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    #tickerInput {
+      flex: 1;
+      min-width: 140px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #tickerInput:focus { border-color: var(--accent); }
+    #tickerInput::placeholder { color: var(--muted); opacity: 0.6; text-transform: none; }
+
+    .btn-add {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      white-space: nowrap;
+    }
+    .btn-add:hover { background: var(--accent-h); transform: translateY(-1px); }
+    .btn-add:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .add-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.6rem;
+    }
+    .add-hint span { color: var(--accent); }
+
+    /* ── Messages ── */
+    .msg {
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-top: 0.75rem;
+      display: none;
+    }
+    .msg-error {
+      background: rgba(220,38,38,0.1);
+      border: 1px solid rgba(220,38,38,0.3);
+      color: #fca5a5;
+    }
+    .msg-success {
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.3);
+      color: #4ade80;
+    }
+
+    /* ── Stock list ── */
+    .stocks-section { }
+    .stocks-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .stocks-header h3 { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .stocks-count { font-size: 0.82rem; color: var(--muted); }
+
+    .stock-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+      transition: border-color 0.2s;
+      gap: 1rem;
+    }
+    .stock-card:hover { border-color: var(--accent); }
+
+    .stock-info { flex: 1; }
+    .stock-name { font-weight: 700; font-size: 1rem; }
+    .stock-symbol { color: var(--muted); font-size: 0.85rem; margin-left: 6px; }
+
+    .stock-data { text-align: right; }
+    .stock-price { font-size: 1.1rem; font-weight: 700; }
+    .stock-change { font-size: 0.85rem; margin-top: 2px; }
+
+    .positive { color: #4ade80; }
+    .negative { color: #f87171; }
+
+    .btn-remove {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: color 0.2s, border-color 0.2s;
+      white-space: nowrap;
+    }
+    .btn-remove:hover { color: #f87171; border-color: #f87171; }
+
+    /* Loading skeleton */
+    .stock-skeleton {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .skeleton-bar {
+      background: var(--surface2);
+      border-radius: 4px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+    }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.4; }
+    .empty-state p { font-size: 0.95rem; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Auth gate ── */
+    #authGate {
+      display: none;
+      text-align: center;
+      padding: 5rem 1rem;
+    }
+    #authGate i { font-size: 3rem; color: var(--accent); margin-bottom: 1.5rem; }
+    #authGate h2 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+    #authGate p { color: var(--muted); margin-bottom: 1.5rem; }
+    .btn-primary {
+      display: inline-block;
+      background: var(--accent);
+      color: white;
+      padding: 0.75rem 1.8rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: var(--accent-h); }
+
+    #mainContent { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav>
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">Stock<span>View</span></a>
+      <div class="nav-right">
+        <a href="index.html"><i class="fa fa-house"></i> Home</a>
+        <a href="StockTrackerEvolution.html">Tracker</a>
+        <a href="Top 8 Pharma.html">Pharma</a>
+        <a href="#" id="logoutLink" style="color:var(--accent);">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page">
+
+    <!-- Auth gate (shown if not logged in) -->
+    <div id="authGate">
+      <i class="fa fa-lock"></i>
+      <h2>Sign in to view your portfolio</h2>
+      <p>Create an account or log in to build and manage your personal watchlist.</p>
+      <a href="login.html" class="btn-primary">Log In</a>
+    </div>
+
+    <!-- Main content (shown when logged in) -->
+    <div id="mainContent">
+
+      <!-- Page header + portfolio name -->
+      <div class="page-header">
+        <div class="page-label">Your Portfolio</div>
+        <div class="portfolio-name-row">
+          <span id="portfolioNameDisplay">My Portfolio</span>
+          <button class="edit-name-btn" onclick="startEditName()"><i class="fa fa-pen"></i> Rename</button>
+        </div>
+        <div id="nameEditRow">
+          <input type="text" id="nameInput" maxlength="30" placeholder="Portfolio name…" />
+          <button class="btn-save-name" onclick="saveName()">Save</button>
+          <button class="btn-cancel-name" onclick="cancelEditName()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Add stock -->
+      <div class="add-section">
+        <h3>Add a stock</h3>
+        <div class="add-row">
+          <input type="text" id="tickerInput" placeholder="e.g. AAPL, TSLA, MRK" maxlength="10" />
+          <button class="btn-add" id="addBtn" onclick="addStock()">
+            <i class="fa fa-plus"></i> Add
+          </button>
+        </div>
+        <div class="add-hint">
+          Enter any stock ticker. Max <span>8 stocks</span> per portfolio.
+        </div>
+        <div class="msg msg-error" id="addError"></div>
+        <div class="msg msg-success" id="addSuccess"></div>
+      </div>
+
+      <!-- Stock list -->
+      <div class="stocks-section">
+        <div class="stocks-header">
+          <h3>Watchlist</h3>
+          <span class="stocks-count" id="stocksCount">0 / 8 stocks</span>
+        </div>
+        <div id="stockList">
+          <!-- Stocks rendered here -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp }                         from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut }  from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, updateDoc }  from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyBLf_Pooc_64xVv9P9typnp0GilbhIb5Zw",
+      authDomain:        "stockproject-a8dd8.firebaseapp.com",
+      projectId:         "stockproject-a8dd8",
+      storageBucket:     "stockproject-a8dd8.firebasestorage.app",
+      messagingSenderId: "682770169508",
+      appId:             "1:682770169508:web:b70bcfe161685331123031"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+
+    const TWELVE_KEY = "019effbed54c4b939010eb1072ff71bc";
+    const CACHE_TTL  = 60 * 60 * 1000;
+
+    let currentUser = null;
+    let watchlist   = [];
+    let portfolioName = "My Portfolio";
+
+    // ── Auth state ──────────────────────────────────────────────────────────
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        document.getElementById("authGate").style.display    = "block";
+        document.getElementById("mainContent").style.display = "none";
+        return;
+      }
+
+      currentUser = user;
+      document.getElementById("authGate").style.display    = "none";
+      document.getElementById("mainContent").style.display = "block";
+
+      document.getElementById("logoutLink").addEventListener("click", async (e) => {
+        e.preventDefault();
+        await signOut(auth);
+        localStorage.removeItem("loggedInEmail");
+        localStorage.removeItem("loggedInUID");
+        window.location.href = "index.html";
+      });
+
+      await loadPortfolio();
+    });
+
+    // ── Load from Firestore ─────────────────────────────────────────────────
+    async function loadPortfolio() {
+      const ref  = doc(db, "users", currentUser.uid);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        const data    = snap.data();
+        watchlist     = data.watchlist     || [];
+        portfolioName = data.portfolioName || "My Portfolio";
+      }
+
+      document.getElementById("portfolioNameDisplay").textContent = portfolioName;
+      renderStockList();
+    }
+
+    // ── Render stock list ───────────────────────────────────────────────────
+    function renderStockList() {
+      const container = document.getElementById("stockList");
+      document.getElementById("stocksCount").textContent = `${watchlist.length} / 8 stocks`;
+
+      if (watchlist.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="fa fa-chart-line"></i>
+            <p>No stocks yet. Add your first ticker above.</p>
+          </div>`;
+        return;
+      }
+
+      // Show skeleton cards while loading
+      container.innerHTML = watchlist.map(sym => `
+        <div class="stock-skeleton" id="skeleton-${sym}">
+          <div style="flex:1">
+            <div class="skeleton-bar" style="width:120px;height:16px;margin-bottom:6px;"></div>
+            <div class="skeleton-bar" style="width:60px;height:12px;"></div>
+          </div>
+          <div class="skeleton-bar" style="width:80px;height:20px;"></div>
+        </div>
+      `).join('');
+
+      // Fetch each stock progressively
+      watchlist.forEach(sym => fetchAndRenderStock(sym));
+    }
+
+    async function fetchAndRenderStock(symbol) {
+      const data = await fetchStockData(symbol);
+      const skeleton = document.getElementById(`skeleton-${symbol}`);
+      if (!skeleton) return;
+
+      if (!data) {
+        skeleton.outerHTML = buildStockCard(symbol, null, null, null, true);
+        rewireRemoveBtn(symbol);
+        return;
+      }
+
+      const latest = parseFloat(data[0].close);
+      const prev   = parseFloat(data[1].close);
+      const change = latest - prev;
+      const pct    = ((change / prev) * 100).toFixed(2);
+
+      skeleton.outerHTML = buildStockCard(symbol, latest, change, pct, false);
+      rewireRemoveBtn(symbol);
+    }
+
+    function buildStockCard(symbol, price, change, pct, error) {
+      const priceHtml = error
+        ? `<span style="color:var(--muted);font-size:0.85rem;">No data</span>`
+        : `<div class="stock-price">$${parseFloat(price).toFixed(2)}</div>
+           <div class="stock-change ${change >= 0 ? 'positive' : 'negative'}">
+             ${change >= 0 ? '▲' : '▼'} $${Math.abs(change).toFixed(2)} (${Math.abs(pct)}%)
+           </div>`;
+
+      return `
+        <div class="stock-card" id="card-${symbol}">
+          <div class="stock-info">
+            <span class="stock-name">${symbol}</span>
+          </div>
+          <div class="stock-data">${priceHtml}</div>
+          <button class="btn-remove" data-symbol="${symbol}">
+            <i class="fa fa-xmark"></i> Remove
+          </button>
+        </div>`;
+    }
+
+    function rewireRemoveBtn(symbol) {
+      const btn = document.querySelector(`[data-symbol="${symbol}"]`);
+      if (btn) btn.addEventListener("click", () => removeStock(symbol));
+    }
+
+    // ── Fetch stock data (with cache) ───────────────────────────────────────
+    async function fetchStockData(symbol) {
+      const cacheKey = `twelvedata_${symbol}`;
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { timestamp, values } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_TTL) return values;
+        }
+      } catch (_) {}
+
+      try {
+        const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=30&apikey=${TWELVE_KEY}`;
+        const res  = await fetch(url);
+        const data = await res.json();
+        if (data.status === "error" || !data.values) return null;
+        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+        return data.values;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // ── Add stock ───────────────────────────────────────────────────────────
+    window.addStock = async function () {
+      const input    = document.getElementById("tickerInput");
+      const symbol   = input.value.trim().toUpperCase();
+      const addBtn   = document.getElementById("addBtn");
+      const errorEl  = document.getElementById("addError");
+      const successEl = document.getElementById("addSuccess");
+
+      errorEl.style.display   = "none";
+      successEl.style.display = "none";
+
+      if (!symbol) return;
+
+      if (watchlist.includes(symbol)) {
+        errorEl.textContent   = `${symbol} is already in your portfolio.`;
+        errorEl.style.display = "block";
+        return;
+      }
+      if (watchlist.length >= 8) {
+        errorEl.textContent   = "Maximum 8 stocks per portfolio. Remove one to add another.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      addBtn.disabled    = true;
+      addBtn.innerHTML   = `<span class="spinner"></span> Adding…`;
+
+      // Validate ticker by checking if API returns data
+      const data = await fetchStockData(symbol);
+      if (!data) {
+        errorEl.textContent   = `"${symbol}" not found. Please check the ticker and try again.`;
+        errorEl.style.display = "block";
+        addBtn.disabled    = false;
+        addBtn.innerHTML   = `<i class="fa fa-plus"></i> Add`;
+        return;
+      }
+
+      watchlist.push(symbol);
+      await saveWatchlist();
+
+      input.value        = "";
+      addBtn.disabled    = false;
+      addBtn.innerHTML   = `<i class="fa fa-plus"></i> Add`;
+      successEl.textContent   = `${symbol} added to your portfolio.`;
+      successEl.style.display = "block";
+      setTimeout(() => successEl.style.display = "none", 2500);
+
+      renderStockList();
+    };
+
+    // ── Remove stock ────────────────────────────────────────────────────────
+    async function removeStock(symbol) {
+      watchlist = watchlist.filter(s => s !== symbol);
+      await saveWatchlist();
+      renderStockList();
+    }
+
+    // ── Save watchlist to Firestore ─────────────────────────────────────────
+    async function saveWatchlist() {
+      const ref = doc(db, "users", currentUser.uid);
+      await updateDoc(ref, { watchlist });
+    }
+
+    // ── Portfolio name editing ───────────────────────────────────────────────
+    window.startEditName = function () {
+      document.getElementById("nameEditRow").style.display      = "flex";
+      document.getElementById("nameInput").value                = portfolioName;
+      document.querySelector(".portfolio-name-row").style.display = "none";
+      document.getElementById("nameInput").focus();
+    };
+
+    window.cancelEditName = function () {
+      document.getElementById("nameEditRow").style.display        = "none";
+      document.querySelector(".portfolio-name-row").style.display = "flex";
+    };
+
+    window.saveName = async function () {
+      const input = document.getElementById("nameInput").value.trim();
+      if (!input) return;
+      portfolioName = input;
+      const ref = doc(db, "users", currentUser.uid);
+      await updateDoc(ref, { portfolioName });
+      document.getElementById("portfolioNameDisplay").textContent  = portfolioName;
+      window.cancelEditName();
+    };
+
+    // Allow Enter to add stock
+    document.getElementById("tickerInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") window.addStock();
+    });
+
+    // Allow Enter to save name
+    document.getElementById("nameInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") window.saveName();
+    });
+  </script>
+
+</body>
+</html>
