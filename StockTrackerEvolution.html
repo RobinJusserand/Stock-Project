@@ -514,8 +514,8 @@
     wrap.innerHTML = '';
 
     lwChart = LightweightCharts.createChart(wrap, {
-      width:  wrap.clientWidth,
-      height: 380,
+      autoSize: true,
+      height:   380,
       layout: { background: { color: '#1e293b' }, textColor: '#94a3b8' },
       grid:   { vertLines: { color: 'rgba(51,65,85,0.6)' }, horzLines: { color: 'rgba(51,65,85,0.6)' } },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
@@ -541,11 +541,6 @@
     })));
 
     lwChart.timeScale().fitContent();
-
-    // Responsive resize
-    window.addEventListener('resize', () => {
-      if (lwChart) lwChart.applyOptions({ width: wrap.clientWidth });
-    });
   }
 
   // ── SMA calculation ──────────────────────────────────────────────────────
