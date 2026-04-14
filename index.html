@@ -432,7 +432,7 @@
         <li><a href="#tools">Tools</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#contact">Contact</a></li>
-        <li><a href="portfolio.html" id="portfolioNavLink" style="display:none;">My Portfolio</a></li>
+        <li><a href="portfolio.html" id="portfolioNavLink">My Portfolio</a></li>
         <li><a href="Account.html" class="btn-nav" id="signupBtn">Sign Up</a></li>
         <li><span id="authStatus"></span></li>
       </ul>
@@ -633,8 +633,6 @@
           window.location.reload();
         });
         if (signupBtn) signupBtn.style.display = "none";
-        const portfolioLink = document.getElementById("portfolioNavLink");
-        if (portfolioLink) portfolioLink.style.display = "";
 
         // Load and show portfolio dashboard
         await loadDashboard(user.uid);

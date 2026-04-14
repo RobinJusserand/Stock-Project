@@ -429,8 +429,7 @@
     // ── Auth state ──────────────────────────────────────────────────────────
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        document.getElementById("authGate").style.display    = "block";
-        document.getElementById("mainContent").style.display = "none";
+        window.location.href = "Account.html";
         return;
       }
 
