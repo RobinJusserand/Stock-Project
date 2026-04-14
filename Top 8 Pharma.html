@@ -355,14 +355,16 @@
     function updateTableRow(symbol, stock, allResults) {
       const existingRow = document.querySelector(`tr[data-symbol="${symbol}"], tr[data-pending="${symbol}"]`);
       if (!existingRow) return;
-      const newRow = document.createElement('tr');
-      newRow.innerHTML = buildRow(stock);
-      const inner = newRow.firstElementChild;
-      if (inner) {
-        existingRow.replaceWith(inner);
-        // Re-attach click listener if it's a data row
+
+      // Must use a <tbody> wrapper — browsers strip <tr> tags when parsing innerHTML on a <tr> element
+      const wrapper = document.createElement('tbody');
+      wrapper.innerHTML = buildRow(stock);
+      const newRow = wrapper.firstElementChild;
+
+      if (newRow) {
+        existingRow.replaceWith(newRow);
         if (!stock.error && !stock.pending) {
-          inner.addEventListener('click', () => showEvolution(symbol, allResults));
+          newRow.addEventListener('click', () => showEvolution(symbol, allResults));
         }
       }
     }
