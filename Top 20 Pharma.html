@@ -187,6 +187,18 @@
     }
 
     canvas { width: 100%; }
+
+    .row-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
   </style>
 </head>
 
@@ -206,7 +218,6 @@
 
     <div id="cacheNotice"></div>
     <div id="errorBanner"></div>
-    <div id="loader"><span class="spinner"></span> Loading all stocks in parallel…</div>
 
     <div id="stockData"></div>
     <p class="tip">Click any row to update the chart below.</p>
@@ -244,79 +255,71 @@
     let chartInstance = null;
     let activeSymbol  = null;
 
-    // ─── Load all stocks — batch fetch + per-symbol cache ─────────────────
+    // ─── Load all stocks — sequential fetch with progressive rendering ───────
     async function loadAllStocks(forceRefresh = false) {
-      showLoader(true);
       clearMessages();
       document.getElementById('stockData').innerHTML = '';
 
-      // Step 1: split companies into cached vs needs-fetching
-      const cachedResults = {};
-      const toFetch       = [];
+      // Build initial results array — cached entries are ready immediately, others are pending
+      const results = companies.map(c => {
+        const hit = !forceRefresh && getCached(c.symbol);
+        return hit || { symbol: c.symbol, name: c.name, pending: true };
+      });
 
-      for (const company of companies) {
-        const hit = !forceRefresh && getCached(company.symbol);
-        if (hit) {
-          cachedResults[company.symbol] = hit;
-        } else {
-          toFetch.push(company);
-        }
+      // Render table right away — cached rows show data, pending rows show a spinner
+      renderTable(results);
+
+      // Show chart for first cached entry immediately
+      let chartShown = false;
+      for (const r of results) {
+        if (r.values) { showEvolution(r.symbol, results); chartShown = true; break; }
       }
 
-      // Step 2: fetch all stale/missing symbols in ONE batch request
-      const freshResults = {};
-      if (toFetch.length > 0) {
-        const symbolList = toFetch.map(c => c.symbol).join(',');
-        const url = `https://api.twelvedata.com/time_series?symbol=${symbolList}&interval=1day&outputsize=60&apikey=${API_KEY}`;
+      // Cache notice
+      const cachedCount = results.filter(r => r.fromCache).length;
+      if (cachedCount > 0) {
+        const mins = Math.round((Date.now() - results.find(r => r.fromCache).cachedAt) / 60000);
+        showCacheNotice(`${cachedCount} of ${companies.length} stocks loaded from cache (${mins} min old). Click "Force Refresh" for live data.`);
+      }
+
+      // Fetch each pending stock one at a time with a 500ms gap (free tier: 8 req/min)
+      let fetched = 0;
+      for (let i = 0; i < results.length; i++) {
+        if (!results[i].pending) continue;
+
+        const company = companies[i];
+
+        // Small delay between requests to respect the rate limit
+        if (fetched > 0) await new Promise(r => setTimeout(r, 500));
+        fetched++;
 
         try {
+          const url = `https://api.twelvedata.com/time_series?symbol=${company.symbol}&interval=1day&outputsize=60&apikey=${API_KEY}`;
           const res  = await fetch(url);
           const data = await res.json();
 
-          for (const company of toFetch) {
-            const sym = company.symbol;
-            // When only 1 symbol is requested Twelve Data returns the data directly (no wrapper)
-            const entry = toFetch.length === 1 ? data : data[sym];
-
-            if (!entry || entry.status === 'error') {
-              const code = entry?.code;
-              freshResults[sym] = { symbol: sym, name: company.name, error: code === 429 ? 'rate_limit' : 'invalid' };
-            } else if (!entry.values || entry.values.length === 0) {
-              freshResults[sym] = { symbol: sym, name: company.name, error: 'no_data' };
-            } else {
-              // Save to cache
-              localStorage.setItem(`twelvedata_${sym}`, JSON.stringify({ timestamp: Date.now(), values: entry.values }));
-              freshResults[sym] = { symbol: sym, name: company.name, values: entry.values, fromCache: false };
-            }
+          if (data.status === 'error') {
+            results[i] = { symbol: company.symbol, name: company.name, error: data.code === 429 ? 'rate_limit' : 'invalid' };
+          } else if (!data.values || data.values.length === 0) {
+            results[i] = { symbol: company.symbol, name: company.name, error: 'no_data' };
+          } else {
+            localStorage.setItem(`twelvedata_${company.symbol}`, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+            results[i] = { symbol: company.symbol, name: company.name, values: data.values, fromCache: false };
+            // Show first loaded stock in chart
+            if (!chartShown) { showEvolution(company.symbol, results); chartShown = true; }
           }
         } catch (err) {
-          for (const company of toFetch) {
-            freshResults[company.symbol] = { symbol: company.symbol, name: company.name, error: 'network' };
-          }
+          results[i] = { symbol: company.symbol, name: company.name, error: 'network' };
         }
+
+        // Update just this row in the table (no full re-render)
+        updateTableRow(company.symbol, results[i], results);
       }
 
-      // Step 3: merge results in original company order
-      const results = companies.map(c => cachedResults[c.symbol] || freshResults[c.symbol] || { symbol: c.symbol, name: c.name, error: 'unknown' });
-
-      showLoader(false);
-      renderTable(results);
-
-      // Cache notice
-      const fromCacheList = results.filter(r => r.fromCache);
-      if (fromCacheList.length > 0) {
-        const mins = Math.round((Date.now() - fromCacheList[0].cachedAt) / 60000);
-        showCacheNotice(`${fromCacheList.length} of ${companies.length} stocks loaded from cache (${mins} min old). Click "Force Refresh" to fetch live data.`);
-      }
-
-      // Rate limit warning
+      // Final rate limit warning if any failed
       if (results.some(r => r.error === 'rate_limit')) {
-        showError('API rate limit hit for one or more stocks. Wait a moment and click Refresh.');
+        showError('API rate limit hit. Wait 1 minute and click Refresh.');
       }
-
-      // Auto-show first valid result in chart
-      const first = results.find(r => r.values);
-      if (first) showEvolution(first.symbol, results);
     }
 
     // ─── Build and render table ────────────────────────────────────────────
@@ -354,7 +357,32 @@
       });
     }
 
+    // Update a single row without re-rendering the whole table
+    function updateTableRow(symbol, stock, allResults) {
+      const existingRow = document.querySelector(`tr[data-symbol="${symbol}"], tr[data-pending="${symbol}"]`);
+      if (!existingRow) return;
+      const newRow = document.createElement('tr');
+      newRow.innerHTML = buildRow(stock);
+      const inner = newRow.firstElementChild;
+      if (inner) {
+        existingRow.replaceWith(inner);
+        // Re-attach click listener if it's a data row
+        if (!stock.error && !stock.pending) {
+          inner.addEventListener('click', () => showEvolution(symbol, allResults));
+        }
+      }
+    }
+
     function buildRow(stock) {
+      if (stock.pending) {
+        return `<tr data-pending="${stock.symbol}">
+          <td style="text-align:left;padding-left:12px;color:var(--muted);">
+            <span class="row-spinner"></span> ${stock.name} <span style="font-size:0.85em;opacity:0.6;">${stock.symbol}</span>
+          </td>
+          <td colspan="4" style="color:var(--muted);font-size:0.85em;">Loading…</td>
+        </tr>`;
+      }
+
       if (stock.error) {
         const msg = {
           rate_limit: 'Rate limit — click Refresh in 1 min',
@@ -362,7 +390,7 @@
           no_data:    'No data available',
           network:    'Network error',
         }[stock.error] || 'Error';
-        return `<tr><td colspan="5" style="color:var(--muted);text-align:left;padding-left:12px;">${stock.symbol}: ${msg}</td></tr>`;
+        return `<tr><td colspan="5" style="color:var(--muted);text-align:left;padding-left:12px;">${stock.name} (${stock.symbol}): ${msg}</td></tr>`;
       }
 
       const v      = stock.values;
@@ -472,9 +500,7 @@
     // ─── Helpers ───────────────────────────────────────────────────────────
     function colorClass(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
 
-    function showLoader(show) {
-      document.getElementById('loader').style.display = show ? 'block' : 'none';
-    }
+    function showLoader(show) { /* loader removed — rows show inline spinners */ }
     function showError(msg) {
       const el = document.getElementById('errorBanner');
       el.textContent = msg;
