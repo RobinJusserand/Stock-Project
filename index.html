@@ -432,6 +432,7 @@
         <li><a href="#tools">Tools</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#contact">Contact</a></li>
+        <li><a href="portfolio.html" id="portfolioNavLink" style="display:none;">My Portfolio</a></li>
         <li><a href="Account.html" class="btn-nav" id="signupBtn">Sign Up</a></li>
         <li><span id="authStatus"></span></li>
       </ul>
@@ -467,6 +468,25 @@
       </a>
     </div>
   </section>
+
+  <!-- ── Portfolio Dashboard (logged-in only) ─────────────── -->
+  <div id="portfolioDashboard" style="display:none;">
+    <div class="section">
+      <div class="section-label">Your Portfolio</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:0.75rem;">
+        <h2 class="section-title" id="dashPortfolioName" style="margin-bottom:0;">My Portfolio</h2>
+        <a href="portfolio.html" style="font-size:0.85rem;color:var(--accent);text-decoration:none;font-weight:600;">
+          Manage portfolio <i class="fa fa-arrow-right"></i>
+        </a>
+      </div>
+      <p class="section-sub" style="margin-bottom:1.5rem;">Your watchlist — updated daily.</p>
+      <div id="dashStockGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;"></div>
+      <div id="dashEmpty" style="display:none;text-align:center;padding:2rem;color:var(--muted);font-size:0.95rem;">
+        No stocks yet. <a href="portfolio.html" style="color:var(--accent);text-decoration:none;font-weight:600;">Add your first stock →</a>
+      </div>
+    </div>
+    <hr class="divider">
+  </div>
 
   <hr class="divider">
 
@@ -573,8 +593,9 @@
   </footer>
 
   <script type="module">
-    import { initializeApp }                from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { initializeApp }                        from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc }            from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey:            "AIzaSyBLf_Pooc_64xVv9P9typnp0GilbhIb5Zw",
@@ -587,14 +608,17 @@
 
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db   = getFirestore(app);
 
-    // ── Auth state listener ──
-    onAuthStateChanged(auth, (user) => {
+    const TWELVE_KEY = "019effbed54c4b939010eb1072ff71bc";
+    const CACHE_TTL  = 60 * 60 * 1000;
+
+    // ── Auth state listener ──────────────────────────────────────────────
+    onAuthStateChanged(auth, async (user) => {
       const authEl    = document.getElementById("authStatus");
       const signupBtn = document.getElementById("signupBtn");
 
       if (user) {
-        // Logged in — show username + logout
         const name = user.email.split("@")[0];
         authEl.innerHTML = `
           <span style="color:var(--muted);font-size:0.85rem;">
@@ -608,17 +632,102 @@
           localStorage.removeItem("loggedInUID");
           window.location.reload();
         });
-        // Hide Sign Up button when logged in
         if (signupBtn) signupBtn.style.display = "none";
+        const portfolioLink = document.getElementById("portfolioNavLink");
+        if (portfolioLink) portfolioLink.style.display = "";
+
+        // Load and show portfolio dashboard
+        await loadDashboard(user.uid);
 
       } else {
-        // Logged out — show login link
         authEl.innerHTML = `<a href="login.html" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Login</a>`;
         if (signupBtn) signupBtn.style.display = "";
+        document.getElementById("portfolioDashboard").style.display = "none";
       }
     });
 
-    // ── Mobile menu ──
+    // ── Load portfolio from Firestore ────────────────────────────────────
+    async function loadDashboard(uid) {
+      const snap = await getDoc(doc(db, "users", uid));
+      if (!snap.exists()) return;
+
+      const data      = snap.data();
+      const watchlist = data.watchlist     || [];
+      const name      = data.portfolioName || "My Portfolio";
+
+      document.getElementById("dashPortfolioName").textContent = name;
+      document.getElementById("portfolioDashboard").style.display = "block";
+
+      if (watchlist.length === 0) {
+        document.getElementById("dashEmpty").style.display     = "block";
+        document.getElementById("dashStockGrid").style.display = "none";
+        return;
+      }
+
+      document.getElementById("dashEmpty").style.display     = "none";
+      document.getElementById("dashStockGrid").style.display = "grid";
+
+      // Render skeleton cards
+      const grid = document.getElementById("dashStockGrid");
+      grid.innerHTML = watchlist.map(sym => `
+        <div id="dash-${sym}" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem;animation:pulse 1.5s ease-in-out infinite;">
+          <div style="background:var(--surface2);height:14px;width:70%;border-radius:4px;margin-bottom:8px;"></div>
+          <div style="background:var(--surface2);height:20px;width:50%;border-radius:4px;"></div>
+        </div>
+      `).join('');
+
+      // Fetch each stock and update its card
+      for (const sym of watchlist) {
+        const values = await fetchStock(sym);
+        const card   = document.getElementById(`dash-${sym}`);
+        if (!card) continue;
+
+        if (!values) {
+          card.innerHTML = `
+            <div style="font-weight:700;margin-bottom:4px;">${sym}</div>
+            <div style="color:var(--muted);font-size:0.82rem;">No data</div>`;
+          card.style.animation = "none";
+          continue;
+        }
+
+        const latest = parseFloat(values[0].close);
+        const prev   = parseFloat(values[1].close);
+        const change = latest - prev;
+        const pct    = ((change / prev) * 100).toFixed(2);
+        const color  = change >= 0 ? "#4ade80" : "#f87171";
+        const arrow  = change >= 0 ? "▲" : "▼";
+
+        card.style.animation = "none";
+        card.style.cursor    = "pointer";
+        card.title           = "Click to view chart";
+        card.onclick         = () => window.location.href = `StockTrackerEvolution.html?symbol=${sym}`;
+        card.innerHTML = `
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:2px;">${sym}</div>
+          <div style="font-size:1.2rem;font-weight:800;margin-bottom:4px;">$${latest.toFixed(2)}</div>
+          <div style="color:${color};font-size:0.85rem;font-weight:600;">${arrow} ${Math.abs(change).toFixed(2)} (${Math.abs(pct)}%)</div>`;
+      }
+    }
+
+    // ── Fetch with cache ─────────────────────────────────────────────────
+    async function fetchStock(symbol) {
+      const key = `twelvedata_${symbol}`;
+      try {
+        const cached = localStorage.getItem(key);
+        if (cached) {
+          const { timestamp, values } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_TTL) return values;
+        }
+      } catch (_) {}
+      try {
+        const res  = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=10&apikey=${TWELVE_KEY}`);
+        const data = await res.json();
+        if (data.status === "error" || !data.values) return null;
+        localStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+        return data.values;
+      } catch (_) { return null; }
+    }
+
+    // ── Mobile menu ──────────────────────────────────────────────────────
     window.toggleMenu = function() {
       document.getElementById("mobileMenu").classList.toggle("open");
     };
