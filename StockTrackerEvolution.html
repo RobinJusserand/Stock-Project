@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
@@ -22,8 +23,7 @@
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background-color: var(--bg);
       color: var(--text);
     }
@@ -40,7 +40,7 @@
     }
 
     section {
-      max-width: 800px;
+      max-width: 860px;
       margin: 20px auto;
       background-color: var(--surface);
       padding: 20px;
@@ -100,12 +100,9 @@
     .negative { color: #f87171; font-weight: bold; }
     .neutral  { color: var(--muted); }
 
-    canvas { width: 100%; margin-top: 20px; }
-
     #homeButton {
       position: fixed;
-      top: 12px;
-      left: 12px;
+      top: 12px; left: 12px;
       background-color: var(--surface);
       color: var(--text);
       padding: 8px 14px;
@@ -125,11 +122,9 @@
       font-size: 16px;
       color: var(--muted);
     }
-
     .spinner {
       display: inline-block;
-      width: 20px;
-      height: 20px;
+      width: 20px; height: 20px;
       border: 3px solid var(--border);
       border-top-color: var(--accent);
       border-radius: 50%;
@@ -148,7 +143,6 @@
       display: none;
       margin-top: 10px;
     }
-
     #cacheNotice {
       font-size: 0.82em;
       color: #93c5fd;
@@ -157,6 +151,78 @@
       padding: 8px 14px;
       border-radius: 8px;
       margin-top: 8px;
+      display: none;
+    }
+
+    /* ── Chart controls ─────────────────────────────────── */
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    #chartTitle {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .chart-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-group {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 5px 11px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 0;
+      transition: background 0.15s, color 0.15s;
+      transform: none;
+    }
+    .ctrl-btn:hover { background: var(--surface2); color: var(--text); transform: none; }
+    .ctrl-btn.active { background: var(--accent); color: white; }
+
+    .sma-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 11px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.15s;
+      transform: none;
+    }
+    .sma-btn:hover { border-color: var(--accent); color: var(--text); transform: none; }
+    .sma-btn.active { background: rgba(74,222,128,0.15); border-color: #4ade80; color: #4ade80; }
+
+    /* Chart containers */
+    #lineChartWrap { margin-top: 4px; }
+    #lineChartWrap canvas { width: 100% !important; }
+    #candleChartWrap {
+      margin-top: 4px;
+      height: 380px;
+      border-radius: 8px;
+      overflow: hidden;
       display: none;
     }
   </style>
@@ -184,18 +250,76 @@
 </section>
 
 <section id="chartSection" style="display:none;">
-  <h2 id="chartTitle">Price History</h2>
-  <canvas id="stockChart"></canvas>
+  <div class="chart-header">
+    <h2 id="chartTitle">Price History</h2>
+    <div class="chart-controls">
+      <!-- Timeframe -->
+      <div class="ctrl-group" id="tfGroup">
+        <button class="ctrl-btn" data-tf="1W">1W</button>
+        <button class="ctrl-btn" data-tf="1M">1M</button>
+        <button class="ctrl-btn active" data-tf="3M">3M</button>
+        <button class="ctrl-btn" data-tf="6M">6M</button>
+        <button class="ctrl-btn" data-tf="1Y">1Y</button>
+      </div>
+      <!-- Chart type -->
+      <div class="ctrl-group" id="typeGroup">
+        <button class="ctrl-btn active" data-type="line">Line</button>
+        <button class="ctrl-btn" data-type="candle">Candle</button>
+      </div>
+      <!-- SMA toggle -->
+      <button class="sma-btn" id="smaToggle">SMA 20</button>
+    </div>
+  </div>
+
+  <div id="lineChartWrap"><canvas id="stockChart"></canvas></div>
+  <div id="candleChartWrap"></div>
 </section>
 
 <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
 
 <script>
-  const API_KEY     = "019effbed54c4b939010eb1072ff71bc";
-  const CACHE_TTL   = 60 * 60 * 1000; // 1 hour in ms
-  let   chartInstance = null;
+  const API_KEY   = "019effbed54c4b939010eb1072ff71bc";
+  const CACHE_TTL = 60 * 60 * 1000;
 
-  // ─── Main entry point ────────────────────────────────────────────────────
+  // ── Chart state ──────────────────────────────────────────────────────────
+  let chartInstance = null;
+  let lwChart       = null;
+  let currentValues = null;
+  let currentSymbol = '';
+  let currentTF     = '3M';
+  let currentType   = 'line';
+  let showSMA       = false;
+
+  const TF_DAYS = { '1W': 5, '1M': 21, '3M': 63, '6M': 126, '1Y': 252 };
+
+  // ── Wire up controls ─────────────────────────────────────────────────────
+  document.querySelectorAll('#tfGroup .ctrl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#tfGroup .ctrl-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTF = btn.dataset.tf;
+      redrawChart();
+    });
+  });
+
+  document.querySelectorAll('#typeGroup .ctrl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#typeGroup .ctrl-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentType = btn.dataset.type;
+      // Hide SMA toggle for candlestick (SMA on candle = visual noise)
+      document.getElementById('smaToggle').style.display = currentType === 'line' ? '' : 'none';
+      redrawChart();
+    });
+  });
+
+  document.getElementById('smaToggle').addEventListener('click', () => {
+    showSMA = !showSMA;
+    document.getElementById('smaToggle').classList.toggle('active', showSMA);
+    redrawChart();
+  });
+
+  // ── Main entry point ─────────────────────────────────────────────────────
   async function getStockData(forceRefresh = false) {
     const symbol = document.getElementById("stockSymbol").value.trim().toUpperCase();
     if (!symbol) return;
@@ -204,12 +328,15 @@
     clearError();
     document.getElementById("stockData").innerHTML = "";
     document.getElementById("chartSection").style.display = "none";
-    document.getElementById("cacheNotice").style.display = "none";
+    document.getElementById("cacheNotice").style.display  = "none";
 
     try {
       const { values, fromCache, cachedAt } = await fetchWithCache(symbol, forceRefresh);
+      currentValues = values;
+      currentSymbol = symbol;
       updateStockData(values, symbol);
-      renderChart(values, symbol);
+      document.getElementById("chartSection").style.display = "block";
+      redrawChart();
 
       if (fromCache) {
         const mins = Math.round((Date.now() - cachedAt) / 60000);
@@ -222,7 +349,7 @@
     }
   }
 
-  // ─── Fetch with localStorage cache ───────────────────────────────────────
+  // ── Fetch with cache ─────────────────────────────────────────────────────
   async function fetchWithCache(symbol, forceRefresh) {
     const cacheKey = `twelvedata_${symbol}`;
 
@@ -236,12 +363,11 @@
       }
     }
 
-    // Live fetch
-    const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=60&apikey=${API_KEY}`;
+    // Fetch 1 full year (252 trading days)
+    const url  = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=252&apikey=${API_KEY}`;
     const res  = await fetch(url);
     const data = await res.json();
 
-    // Handle Twelve Data errors
     if (data.status === "error") {
       if (data.code === 429) throw new Error("API rate limit reached. Please wait a moment and try again.");
       if (data.code === 400) throw new Error(`Symbol "${symbol}" not found. Please check the ticker and try again.`);
@@ -251,20 +377,13 @@
       throw new Error("No data returned. The symbol may be invalid or delisted.");
     }
 
-    // Save to cache
     localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), values: data.values }));
-
     return { values: data.values, fromCache: false };
   }
 
-  // ─── Render metrics ───────────────────────────────────────────────────────
-  // Twelve Data returns values[] newest-first:
-  // values[0] = today, values[1] = yesterday, values[5] = ~1 week ago, values[21] = ~1 month ago
+  // ── Render metrics ───────────────────────────────────────────────────────
   function updateStockData(values, symbol) {
-    if (values.length < 2) {
-      showError("Not enough data available for this stock.");
-      return;
-    }
+    if (values.length < 2) { showError("Not enough data available for this stock."); return; }
 
     const latest  = parseFloat(values[0].close);
     const prev    = parseFloat(values[1].close);
@@ -305,78 +424,161 @@
     `;
   }
 
-  // ─── Chart ─────────────────────────────────────────────────────────────────
-  function renderChart(values, symbol) {
-    // Reverse so chart goes oldest → newest (left to right)
-    const reversed = [...values].reverse();
-    const labels = reversed.map(v => v.datetime);
-    const prices = reversed.map(v => parseFloat(v.close));
+  // ── Master redraw ────────────────────────────────────────────────────────
+  function redrawChart() {
+    if (!currentValues || !currentSymbol) return;
 
-    if (chartInstance) {
-      chartInstance.destroy();
-      chartInstance = null;
+    const days    = TF_DAYS[currentTF] || 63;
+    const sliced  = currentValues.slice(0, Math.min(days, currentValues.length));
+    const reversed = [...sliced].reverse(); // oldest → newest
+
+    document.getElementById('chartTitle').textContent =
+      `${currentSymbol} — ${currentTF} (${reversed.length} trading days)`;
+
+    if (currentType === 'line') {
+      document.getElementById('lineChartWrap').style.display  = 'block';
+      document.getElementById('candleChartWrap').style.display = 'none';
+      destroyLW();
+      renderLineChart(reversed);
+    } else {
+      document.getElementById('lineChartWrap').style.display  = 'none';
+      document.getElementById('candleChartWrap').style.display = 'block';
+      destroyLine();
+      renderCandleChart(reversed);
+    }
+  }
+
+  // ── Line chart ───────────────────────────────────────────────────────────
+  function renderLineChart(data) {
+    destroyLine();
+
+    const labels = data.map(v => v.datetime);
+    const prices = data.map(v => parseFloat(v.close));
+    const datasets = [{
+      label: `${currentSymbol} Close`,
+      data: prices,
+      borderColor: 'rgba(220,38,38,0.9)',
+      backgroundColor: 'rgba(220,38,38,0.08)',
+      borderWidth: 2,
+      pointRadius: data.length > 60 ? 0 : 2,
+      fill: true,
+      tension: 0.3,
+    }];
+
+    // SMA overlay
+    if (showSMA && data.length >= 20) {
+      const sma = calculateSMA(prices, 20);
+      datasets.push({
+        label: 'SMA 20',
+        data: sma,
+        borderColor: '#4ade80',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.3,
+        spanGaps: true,
+      });
     }
 
-    document.getElementById("chartTitle").textContent = `${symbol} — Last ${values.length} Trading Days`;
-    document.getElementById("chartSection").style.display = "block";
-
-    const ctx = document.getElementById("stockChart").getContext("2d");
+    const ctx = document.getElementById('stockChart').getContext('2d');
     chartInstance = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: `${symbol} Closing Price`,
-          data: prices,
-          borderColor: "rgba(220, 38, 38, 0.9)",
-          backgroundColor: "rgba(220, 38, 38, 0.08)",
-          borderWidth: 2,
-          pointRadius: 2,
-          fill: true,
-          tension: 0.3,
-        }],
-      },
+      type: 'line',
+      data: { labels, datasets },
       options: {
         responsive: true,
+        animation: { duration: 300 },
         plugins: {
-          legend: { display: true },
+          legend: { display: showSMA },
           tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
         },
         scales: {
           x: {
-            ticks: { maxTicksLimit: 10, maxRotation: 30, color: '#94a3b8' },
-            grid: { color: 'rgba(51, 65, 85, 0.6)' }
+            ticks: { maxTicksLimit: 8, maxRotation: 30, color: '#94a3b8' },
+            grid:  { color: 'rgba(51,65,85,0.6)' }
           },
           y: {
-            ticks: { callback: (v) => `$${v.toFixed(0)}`, color: '#94a3b8' },
-            grid: { color: 'rgba(51, 65, 85, 0.6)' }
+            ticks: { callback: v => `$${v.toFixed(0)}`, color: '#94a3b8' },
+            grid:  { color: 'rgba(51,65,85,0.6)' }
           }
         }
       }
     });
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-  function colorClass(n) {
-    return n > 0 ? "positive" : n < 0 ? "negative" : "neutral";
+  // ── Candlestick chart ────────────────────────────────────────────────────
+  function renderCandleChart(data) {
+    destroyLW();
+
+    const wrap = document.getElementById('candleChartWrap');
+    wrap.innerHTML = '';
+
+    lwChart = LightweightCharts.createChart(wrap, {
+      width:  wrap.clientWidth,
+      height: 380,
+      layout: { background: { color: '#1e293b' }, textColor: '#94a3b8' },
+      grid:   { vertLines: { color: 'rgba(51,65,85,0.6)' }, horzLines: { color: 'rgba(51,65,85,0.6)' } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor: '#334155' },
+      timeScale: { borderColor: '#334155', timeVisible: true },
+    });
+
+    const candleSeries = lwChart.addCandlestickSeries({
+      upColor:          '#4ade80',
+      downColor:        '#f87171',
+      borderUpColor:    '#4ade80',
+      borderDownColor:  '#f87171',
+      wickUpColor:      '#4ade80',
+      wickDownColor:    '#f87171',
+    });
+
+    candleSeries.setData(data.map(v => ({
+      time:  v.datetime,
+      open:  parseFloat(v.open),
+      high:  parseFloat(v.high),
+      low:   parseFloat(v.low),
+      close: parseFloat(v.close),
+    })));
+
+    lwChart.timeScale().fitContent();
+
+    // Responsive resize
+    window.addEventListener('resize', () => {
+      if (lwChart) lwChart.applyOptions({ width: wrap.clientWidth });
+    });
   }
-  function showLoader(show) {
-    document.getElementById("loader").style.display = show ? "block" : "none";
+
+  // ── SMA calculation ──────────────────────────────────────────────────────
+  function calculateSMA(prices, period) {
+    return prices.map((_, i) => {
+      if (i < period - 1) return null;
+      const slice = prices.slice(i - period + 1, i + 1);
+      return slice.reduce((a, b) => a + b, 0) / period;
+    });
   }
+
+  // ── Destroy helpers ──────────────────────────────────────────────────────
+  function destroyLine() {
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  }
+  function destroyLW() {
+    if (lwChart) { lwChart.remove(); lwChart = null; }
+  }
+
+  // ── Misc helpers ─────────────────────────────────────────────────────────
+  function colorClass(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
+  function showLoader(show) { document.getElementById('loader').style.display = show ? 'block' : 'none'; }
   function showError(msg) {
-    const el = document.getElementById("errorMsg");
-    el.textContent = msg;
-    el.style.display = "block";
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg; el.style.display = 'block';
   }
   function clearError() {
-    const el = document.getElementById("errorMsg");
-    el.textContent = "";
-    el.style.display = "none";
+    const el = document.getElementById('errorMsg');
+    el.textContent = ''; el.style.display = 'none';
   }
   function showCacheNotice(msg) {
-    const el = document.getElementById("cacheNotice");
-    el.textContent = msg;
-    el.style.display = "block";
+    const el = document.getElementById('cacheNotice');
+    el.textContent = msg; el.style.display = 'block';
   }
 </script>
 
