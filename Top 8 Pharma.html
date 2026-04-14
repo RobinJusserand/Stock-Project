@@ -608,26 +608,45 @@
       destroyLW();
       const wrap = document.getElementById('candleChartWrap');
       wrap.innerHTML = '';
-      lwChart = LightweightCharts.createChart(wrap, {
-        autoSize: true,
-        height: 380,
-        layout: { background: { color: '#1e293b' }, textColor: '#94a3b8' },
-        grid: { vertLines: { color: 'rgba(51,65,85,0.6)' }, horzLines: { color: 'rgba(51,65,85,0.6)' } },
-        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-        rightPriceScale: { borderColor: '#334155' },
-        timeScale: { borderColor: '#334155' },
+
+      // Wait one frame so the browser paints the visible div before reading its width
+      requestAnimationFrame(() => {
+        const width = wrap.offsetWidth || wrap.parentElement?.offsetWidth || 760;
+        lwChart = LightweightCharts.createChart(wrap, {
+          width,
+          height: 380,
+          layout: { background: { color: '#1e293b' }, textColor: '#94a3b8' },
+          grid: { vertLines: { color: 'rgba(51,65,85,0.6)' }, horzLines: { color: 'rgba(51,65,85,0.6)' } },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+          rightPriceScale: { borderColor: '#334155' },
+          timeScale: { borderColor: '#334155' },
+        });
+
+        const series = lwChart.addCandlestickSeries({
+          upColor: '#4ade80', downColor: '#f87171',
+          borderUpColor: '#4ade80', borderDownColor: '#f87171',
+          wickUpColor: '#4ade80', wickDownColor: '#f87171',
+        });
+
+        // Filter out any points missing OHLC data
+        const clean = data
+          .map(v => ({
+            time:  v.datetime,
+            open:  parseFloat(v.open),
+            high:  parseFloat(v.high),
+            low:   parseFloat(v.low),
+            close: parseFloat(v.close),
+          }))
+          .filter(v => !isNaN(v.open) && !isNaN(v.high) && !isNaN(v.low) && !isNaN(v.close));
+
+        series.setData(clean);
+        lwChart.timeScale().fitContent();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+          if (lwChart) lwChart.applyOptions({ width: wrap.offsetWidth });
+        });
       });
-      const series = lwChart.addCandlestickSeries({
-        upColor: '#4ade80', downColor: '#f87171',
-        borderUpColor: '#4ade80', borderDownColor: '#f87171',
-        wickUpColor: '#4ade80', wickDownColor: '#f87171',
-      });
-      series.setData(data.map(v => ({
-        time: v.datetime,
-        open: parseFloat(v.open), high: parseFloat(v.high),
-        low:  parseFloat(v.low),  close: parseFloat(v.close),
-      })));
-      lwChart.timeScale().fitContent();
     }
 
     function calculateSMA(prices, period) {
