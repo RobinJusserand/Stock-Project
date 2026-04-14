@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top 8 Pharma — Stock Performance Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   10px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      background-color: var(--surface);
+      color: var(--text);
+      text-align: center;
+      padding: 1.25em;
+      border-bottom: 1px solid var(--border);
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    section {
+      max-width: 960px;
+      margin: 20px auto;
+      background-color: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 11px 12px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: var(--surface2);
+      color: var(--muted);
+      font-size: 0.85em;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tbody tr {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover { background-color: rgba(220, 38, 38, 0.07); }
+    tbody tr.active-row {
+      background-color: rgba(220, 38, 38, 0.12);
+      border-left: 3px solid var(--accent);
+      font-weight: bold;
+    }
+
+    .positive { color: #4ade80; font-weight: bold; }
+    .negative { color: #f87171; font-weight: bold; }
+    .neutral  { color: var(--muted); }
+
+    .changeDateRange {
+      font-size: 0.78em;
+      color: var(--muted);
+      display: block;
+      margin-top: 2px;
+      font-weight: normal;
+      opacity: 0.7;
+    }
+
+    #loader {
+      text-align: center;
+      padding: 30px;
+      font-size: 16px;
+      color: var(--muted);
+      display: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #errorBanner {
+      background: rgba(220, 38, 38, 0.1);
+      border: 1px solid rgba(220, 38, 38, 0.3);
+      color: #fca5a5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    #cacheNotice {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
+      padding: 8px 14px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 0.85em;
+      display: none;
+    }
+
+    .btn {
+      background-color: var(--accent);
+      color: white;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin-right: 8px;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn:hover { background-color: var(--accent-h); transform: translateY(-1px); }
+
+    .btn-blue {
+      background-color: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-blue:hover { background-color: var(--border); }
+
+    #homeButton {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background-color: var(--surface);
+      color: var(--text);
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: border-color 0.2s;
+    }
+    #homeButton:hover { border-color: var(--accent); color: var(--accent); }
+
+    .tip {
+      font-size: 0.82em;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    #chartSection h2 { margin-bottom: 4px; color: var(--text); }
+    #chartSubtitle {
+      font-size: 0.85em;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    canvas { width: 100%; }
+
+    .row-spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Top 8 Pharma — Stock Performance Tracker</h1>
+  </header>
+
+  <section id="stockSection">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+      <div>
+        <button class="btn btn-blue" onclick="loadAllStocks(false)">⟳ Refresh</button>
+        <button class="btn btn-blue" onclick="loadAllStocks(true)">↺ Force Refresh (bypass cache)</button>
+        <button class="btn" onclick="window.location.href='index.html'">Home</button>
+      </div>
+    </div>
+
+    <div id="cacheNotice"></div>
+    <div id="errorBanner"></div>
+
+    <div id="stockData"></div>
+    <p class="tip">Click any row to update the chart below.</p>
+  </section>
+
+  <section id="chartSection">
+    <h2 id="chartTitle">Stock Evolution</h2>
+    <p id="chartSubtitle">Click a row above to view its price history.</p>
+    <canvas id="stockChart"></canvas>
+  </section>
+
+  <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
+
+  <script>
+    const API_KEY   = "019effbed54c4b939010eb1072ff71bc";
+    const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+    const companies = [
+      { symbol: 'LLY',  name: 'Eli Lilly' },
+      { symbol: 'NVO',  name: 'Novo Nordisk' },
+      { symbol: 'JNJ',  name: 'Johnson & Johnson' },
+      { symbol: 'MRK',  name: 'Merck' },
+      { symbol: 'AZN',  name: 'AstraZeneca' },
+      { symbol: 'NVS',  name: 'Novartis' },
+      { symbol: 'PFE',  name: 'Pfizer' },
+      { symbol: 'SNY',  name: 'Sanofi' },
+    ];
+
+    let chartInstance = null;
+    let activeSymbol  = null;
+
+    // ─── Load all stocks — sequential fetch with progressive rendering ───────
+    async function loadAllStocks(forceRefresh = false) {
+      clearMessages();
+      document.getElementById('stockData').innerHTML = '';
+
+      // Build initial results array — cached entries are ready immediately, others are pending
+      const results = companies.map(c => {
+        const hit = !forceRefresh && getCached(c.symbol);
+        return hit || { symbol: c.symbol, name: c.name, pending: true };
+      });
+
+      // Render table right away — cached rows show data, pending rows show a spinner
+      renderTable(results);
+
+      // Show chart for first cached entry immediately
+      let chartShown = false;
+      for (const r of results) {
+        if (r.values) { showEvolution(r.symbol, results); chartShown = true; break; }
+      }
+
+      // Cache notice
+      const cachedCount = results.filter(r => r.fromCache).length;
+      if (cachedCount > 0) {
+        const mins = Math.round((Date.now() - results.find(r => r.fromCache).cachedAt) / 60000);
+        showCacheNotice(`${cachedCount} of ${companies.length} stocks loaded from cache (${mins} min old). Click "Force Refresh" for live data.`);
+      }
+
+      // Fetch each pending stock one at a time with a 500ms gap (free tier: 8 req/min)
+      let fetched = 0;
+      for (let i = 0; i < results.length; i++) {
+        if (!results[i].pending) continue;
+
+        const company = companies[i];
+
+        // Small delay between requests to respect the rate limit
+        if (fetched > 0) await new Promise(r => setTimeout(r, 500));
+        fetched++;
+
+        try {
+          const url = `https://api.twelvedata.com/time_series?symbol=${company.symbol}&interval=1day&outputsize=60&apikey=${API_KEY}`;
+          const res  = await fetch(url);
+          const data = await res.json();
+
+          if (data.status === 'error') {
+            results[i] = { symbol: company.symbol, name: company.name, error: data.code === 429 ? 'rate_limit' : 'invalid' };
+          } else if (!data.values || data.values.length === 0) {
+            results[i] = { symbol: company.symbol, name: company.name, error: 'no_data' };
+          } else {
+            localStorage.setItem(`twelvedata_${company.symbol}`, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+            results[i] = { symbol: company.symbol, name: company.name, values: data.values, fromCache: false };
+            // Show first loaded stock in chart
+            if (!chartShown) { showEvolution(company.symbol, results); chartShown = true; }
+          }
+        } catch (err) {
+          results[i] = { symbol: company.symbol, name: company.name, error: 'network' };
+        }
+
+        // Update just this row in the table (no full re-render)
+        updateTableRow(company.symbol, results[i], results);
+      }
+
+      // Final rate limit warning if any failed
+      if (results.some(r => r.error === 'rate_limit')) {
+        showError('API rate limit hit. Wait 1 minute and click Refresh.');
+      }
+    }
+
+    // ─── Build and render table ────────────────────────────────────────────
+    function renderTable(results) {
+      const firstValid = results.find(r => r.values && r.values.length > 1);
+      let dailyRange = '', weeklyRange = '', monthlyRange = '';
+
+      if (firstValid) {
+        const v = firstValid.values;
+        dailyRange   = `${v[1].datetime} → ${v[0].datetime}`;
+        weeklyRange  = `${v[Math.min(5,  v.length-1)].datetime} → ${v[0].datetime}`;
+        monthlyRange = `${v[Math.min(21, v.length-1)].datetime} → ${v[0].datetime}`;
+      }
+
+      const rows = results.map(r => buildRow(r)).join('');
+
+      document.getElementById('stockData').innerHTML = `
+        <table id="stockTable">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Price</th>
+              <th>Daily Change <span class="changeDateRange">${dailyRange}</span></th>
+              <th>Weekly Change <span class="changeDateRange">${weeklyRange}</span></th>
+              <th>Monthly Change <span class="changeDateRange">${monthlyRange}</span></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      // Wire up row clicks — pass all results so chart can use cached values
+      document.querySelectorAll('#stockTable tbody tr[data-symbol]').forEach(row => {
+        row.addEventListener('click', () => showEvolution(row.dataset.symbol, results));
+      });
+    }
+
+    // Update a single row without re-rendering the whole table
+    function updateTableRow(symbol, stock, allResults) {
+      const existingRow = document.querySelector(`tr[data-symbol="${symbol}"], tr[data-pending="${symbol}"]`);
+      if (!existingRow) return;
+      const newRow = document.createElement('tr');
+      newRow.innerHTML = buildRow(stock);
+      const inner = newRow.firstElementChild;
+      if (inner) {
+        existingRow.replaceWith(inner);
+        // Re-attach click listener if it's a data row
+        if (!stock.error && !stock.pending) {
+          inner.addEventListener('click', () => showEvolution(symbol, allResults));
+        }
+      }
+    }
+
+    function buildRow(stock) {
+      if (stock.pending) {
+        return `<tr data-pending="${stock.symbol}">
+          <td style="text-align:left;padding-left:12px;color:var(--muted);">
+            <span class="row-spinner"></span> ${stock.name} <span style="font-size:0.85em;opacity:0.6;">${stock.symbol}</span>
+          </td>
+          <td colspan="4" style="color:var(--muted);font-size:0.85em;">Loading…</td>
+        </tr>`;
+      }
+
+      if (stock.error) {
+        const msg = {
+          rate_limit: 'Rate limit — click Refresh in 1 min',
+          invalid:    'Symbol not found',
+          no_data:    'No data available',
+          network:    'Network error',
+        }[stock.error] || 'Error';
+        return `<tr><td colspan="5" style="color:var(--muted);text-align:left;padding-left:12px;">${stock.name} (${stock.symbol}): ${msg}</td></tr>`;
+      }
+
+      const v      = stock.values;
+      const latest = parseFloat(v[0].close);
+      const prev   = parseFloat(v[1].close);
+      const week   = parseFloat(v[Math.min(5,  v.length-1)].close);
+      const month  = parseFloat(v[Math.min(21, v.length-1)].close);
+
+      const dChg = latest - prev;
+      const wChg = latest - week;
+      const mChg = latest - month;
+
+      const fmt = (n) => Math.abs(n).toFixed(2);
+      const pct = (chg, base) => Math.abs((chg / base) * 100).toFixed(2);
+      const arr = (n) => n > 0 ? '▲ ' : n < 0 ? '▼ ' : '';
+
+      return `
+        <tr data-symbol="${stock.symbol}" title="Click to view chart">
+          <td style="text-align:left;">
+            <strong>${stock.name}</strong>
+            <span style="color:var(--muted);font-size:0.85em;margin-left:4px;">${stock.symbol}</span>
+          </td>
+          <td>$${latest.toFixed(2)}</td>
+          <td class="${colorClass(dChg)}">${arr(dChg)}$${fmt(dChg)} (${pct(dChg, prev)}%)</td>
+          <td class="${colorClass(wChg)}">${arr(wChg)}$${fmt(wChg)} (${pct(wChg, week)}%)</td>
+          <td class="${colorClass(mChg)}">${arr(mChg)}$${fmt(mChg)} (${pct(mChg, month)}%)</td>
+        </tr>
+      `;
+    }
+
+    // ─── Chart ─────────────────────────────────────────────────────────────
+    async function showEvolution(symbol, allResults) {
+      // Highlight active row
+      document.querySelectorAll('#stockTable tbody tr').forEach(r => r.classList.remove('active-row'));
+      const row = document.querySelector(`tr[data-symbol="${symbol}"]`);
+      if (row) row.classList.add('active-row');
+
+      activeSymbol = symbol;
+
+      // Use already-fetched data from allResults if available, then try cache, then skip
+      let stock = allResults?.find(r => r.symbol === symbol && r.values);
+      if (!stock) stock = getCached(symbol);
+      if (!stock || stock.error || !stock.values) return;
+
+      const reversed = [...stock.values].reverse();
+      const labels   = reversed.map(v => v.datetime);
+      const prices   = reversed.map(v => parseFloat(v.close));
+
+      // Destroy old chart
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+
+      document.getElementById('chartTitle').textContent    = `${stock.name} (${symbol}) — Last ${stock.values.length} Trading Days`;
+      document.getElementById('chartSubtitle').textContent = '';
+
+      const ctx = document.getElementById('stockChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: `${symbol} Closing Price`,
+            data: prices,
+            borderColor: 'rgba(220, 38, 38, 0.9)',
+            backgroundColor: 'rgba(220, 38, 38, 0.08)',
+            borderWidth: 2,
+            pointRadius: 2,
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true },
+            tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
+          },
+          scales: {
+            x: {
+              ticks: { maxTicksLimit: 10, maxRotation: 30, color: '#94a3b8' },
+              grid: { color: 'rgba(51, 65, 85, 0.6)' }
+            },
+            y: {
+              ticks: { callback: (v) => `$${v.toFixed(0)}`, color: '#94a3b8' },
+              grid: { color: 'rgba(51, 65, 85, 0.6)' }
+            }
+          }
+        }
+      });
+    }
+
+    // ─── Cache helper ──────────────────────────────────────────────────────
+    function getCached(symbol) {
+      try {
+        const raw = localStorage.getItem(`twelvedata_${symbol}`);
+        if (!raw) return null;
+        const { timestamp, values } = JSON.parse(raw);
+        if (Date.now() - timestamp < CACHE_TTL) {
+          return { symbol, name: companies.find(c => c.symbol === symbol)?.name, values, fromCache: true, cachedAt: timestamp };
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    // ─── Helpers ───────────────────────────────────────────────────────────
+    function colorClass(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
+
+    function showLoader(show) { /* loader removed — rows show inline spinners */ }
+    function showError(msg) {
+      const el = document.getElementById('errorBanner');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function showCacheNotice(msg) {
+      const el = document.getElementById('cacheNotice');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+    function clearMessages() {
+      document.getElementById('errorBanner').style.display = 'none';
+      document.getElementById('cacheNotice').style.display = 'none';
+    }
+
+    // ─── Init ──────────────────────────────────────────────────────────────
+    window.onload = () => loadAllStocks(false);
+  </script>
+
+</body>
+</html>
