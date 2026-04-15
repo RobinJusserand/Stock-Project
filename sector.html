@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sector Dashboard — StockView</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --accent-h: #b91c1c;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   10px;
+    }
+    body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; margin:0; padding:0; background:var(--bg); color:var(--text); }
+
+    header { background:var(--surface); border-bottom:1px solid var(--border); padding:1.25em 2rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; }
+    .header-left h1 { font-size:1.3rem; font-weight:700; margin:0; }
+    .header-left p  { font-size:0.85rem; color:var(--muted); margin:2px 0 0; }
+
+    /* Sector tabs */
+    .sector-tabs { display:flex; gap:0.5rem; flex-wrap:wrap; }
+    .sector-tab {
+      background:var(--bg);
+      border:1px solid var(--border);
+      color:var(--muted);
+      padding:6px 16px;
+      border-radius:20px;
+      cursor:pointer;
+      font-size:0.85rem;
+      font-weight:600;
+      text-decoration:none;
+      transition:all 0.15s;
+    }
+    .sector-tab:hover { border-color:var(--accent); color:var(--text); }
+    .sector-tab.active { background:var(--accent); border-color:var(--accent); color:white; }
+
+    section { max-width:960px; margin:20px auto; background:var(--surface); padding:20px; border-radius:var(--radius); border:1px solid var(--border); }
+
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td { padding:11px 12px; text-align:center; border-bottom:1px solid var(--border); }
+    th { background:var(--surface2); color:var(--muted); font-size:0.85em; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+    tbody tr { cursor:pointer; transition:background 0.15s; }
+    tbody tr:hover { background:rgba(220,38,38,0.07); }
+    tbody tr.active-row { background:rgba(220,38,38,0.12); border-left:3px solid var(--accent); font-weight:bold; }
+    .positive { color:#4ade80; font-weight:bold; }
+    .negative { color:#f87171; font-weight:bold; }
+    .neutral  { color:var(--muted); }
+    .changeDateRange { font-size:0.78em; color:var(--muted); display:block; margin-top:2px; font-weight:normal; opacity:0.7; }
+
+    /* Buttons */
+    .btn { background:var(--accent); color:white; padding:9px 18px; border:none; border-radius:7px; cursor:pointer; font-size:14px; font-weight:600; margin-right:8px; transition:background 0.2s,transform 0.15s; }
+    .btn:hover { background:var(--accent-h); transform:translateY(-1px); }
+    .btn-ghost { background:var(--surface2); border:1px solid var(--border); color:var(--text); }
+    .btn-ghost:hover { background:var(--border); transform:translateY(-1px); }
+
+    #homeButton { position:fixed; top:12px; left:12px; background:var(--surface); color:var(--text); padding:8px 14px; border:1px solid var(--border); border-radius:7px; cursor:pointer; font-size:0.85rem; font-weight:600; transition:border-color 0.2s,color 0.2s; }
+    #homeButton:hover { border-color:var(--accent); color:var(--accent); }
+
+    .tip { font-size:0.82em; color:var(--muted); margin-top:8px; }
+    #errorBanner { background:rgba(220,38,38,0.1); border:1px solid rgba(220,38,38,0.3); color:#fca5a5; padding:10px 14px; border-radius:8px; margin-bottom:10px; display:none; }
+    #cacheNotice { background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); color:#93c5fd; padding:8px 14px; border-radius:8px; margin-bottom:10px; font-size:0.85em; display:none; }
+
+    .row-spinner { display:inline-block; width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Chart controls */
+    .chart-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem; margin-bottom:1rem; }
+    .chart-controls { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
+    .ctrl-group { display:flex; background:var(--bg); border:1px solid var(--border); border-radius:7px; overflow:hidden; }
+    .ctrl-btn { background:none; border:none; color:var(--muted); padding:5px 11px; font-size:0.8rem; font-weight:600; cursor:pointer; border-radius:0; transition:background 0.15s,color 0.15s; transform:none; }
+    .ctrl-btn:hover { background:var(--surface2); color:var(--text); transform:none; }
+    .ctrl-btn.active { background:var(--accent); color:white; }
+    .sma-btn { background:var(--bg); border:1px solid var(--border); color:var(--muted); padding:5px 11px; font-size:0.8rem; font-weight:600; border-radius:7px; cursor:pointer; transition:all 0.15s; transform:none; }
+    .sma-btn:hover { border-color:var(--accent); color:var(--text); transform:none; }
+    .sma-btn.active { background:rgba(74,222,128,0.15); border-color:#4ade80; color:#4ade80; }
+    #lineChartWrap canvas { width:100% !important; }
+    #candleChartWrap { height:380px; border-radius:8px; overflow:hidden; display:none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <h1 id="sectorTitle">Sector Dashboard</h1>
+      <p id="sectorSubtitle">Loading…</p>
+    </div>
+    <div class="sector-tabs">
+      <a class="sector-tab" href="sector.html?s=tech">Tech</a>
+      <a class="sector-tab" href="sector.html?s=finance">Finance</a>
+      <a class="sector-tab" href="sector.html?s=energy">Energy</a>
+      <a class="sector-tab" href="Top 8 Pharma.html">Pharma</a>
+    </div>
+  </header>
+
+  <section id="stockSection">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <button class="btn btn-ghost" onclick="loadAllStocks(false)">⟳ Refresh</button>
+      <button class="btn btn-ghost" onclick="loadAllStocks(true)">↺ Force Refresh</button>
+      <button class="btn" onclick="window.location.href='index.html'">Home</button>
+    </div>
+    <div id="cacheNotice"></div>
+    <div id="errorBanner"></div>
+    <div id="stockData"></div>
+    <p class="tip">Click any row to update the chart below.</p>
+  </section>
+
+  <section id="chartSection">
+    <div class="chart-header">
+      <div>
+        <h2 id="chartTitle" style="margin:0;">Stock Evolution</h2>
+        <p id="chartSubtitle" style="font-size:0.85em;color:var(--muted);margin:4px 0 0;">Click a row above to view its price history.</p>
+      </div>
+      <div class="chart-controls">
+        <div class="ctrl-group" id="tfGroup">
+          <button class="ctrl-btn" data-tf="1W">1W</button>
+          <button class="ctrl-btn" data-tf="1M">1M</button>
+          <button class="ctrl-btn active" data-tf="3M">3M</button>
+          <button class="ctrl-btn" data-tf="6M">6M</button>
+          <button class="ctrl-btn" data-tf="1Y">1Y</button>
+        </div>
+        <div class="ctrl-group" id="typeGroup">
+          <button class="ctrl-btn active" data-type="line">Line</button>
+          <button class="ctrl-btn" data-type="candle">Candle</button>
+        </div>
+        <button class="sma-btn" id="smaToggle">SMA 20</button>
+        <button class="sma-btn" id="volToggle">Volume</button>
+      </div>
+    </div>
+    <div id="lineChartWrap"><canvas id="stockChart"></canvas></div>
+    <div id="candleChartWrap"></div>
+  </section>
+
+  <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
+
+  <script>
+    const API_KEY   = "019effbed54c4b939010eb1072ff71bc";
+    const CACHE_TTL = 60 * 60 * 1000;
+
+    const SECTORS = {
+      tech: {
+        name: 'Technology',
+        subtitle: 'Top 8 tech companies by market cap',
+        companies: [
+          { symbol: 'AAPL',  name: 'Apple' },
+          { symbol: 'MSFT',  name: 'Microsoft' },
+          { symbol: 'NVDA',  name: 'Nvidia' },
+          { symbol: 'GOOGL', name: 'Alphabet' },
+          { symbol: 'META',  name: 'Meta' },
+          { symbol: 'AMZN',  name: 'Amazon' },
+          { symbol: 'TSLA',  name: 'Tesla' },
+          { symbol: 'ORCL',  name: 'Oracle' },
+        ]
+      },
+      finance: {
+        name: 'Finance',
+        subtitle: 'Top 8 financial companies by market cap',
+        companies: [
+          { symbol: 'JPM',  name: 'JPMorgan Chase' },
+          { symbol: 'BAC',  name: 'Bank of America' },
+          { symbol: 'GS',   name: 'Goldman Sachs' },
+          { symbol: 'MS',   name: 'Morgan Stanley' },
+          { symbol: 'WFC',  name: 'Wells Fargo' },
+          { symbol: 'BLK',  name: 'BlackRock' },
+          { symbol: 'V',    name: 'Visa' },
+          { symbol: 'MA',   name: 'Mastercard' },
+        ]
+      },
+      energy: {
+        name: 'Energy',
+        subtitle: 'Top 8 energy companies by market cap',
+        companies: [
+          { symbol: 'XOM',  name: 'ExxonMobil' },
+          { symbol: 'CVX',  name: 'Chevron' },
+          { symbol: 'SHEL', name: 'Shell' },
+          { symbol: 'BP',   name: 'BP' },
+          { symbol: 'TTE',  name: 'TotalEnergies' },
+          { symbol: 'COP',  name: 'ConocoPhillips' },
+          { symbol: 'SLB',  name: 'SLB' },
+          { symbol: 'EOG',  name: 'EOG Resources' },
+        ]
+      }
+    };
+
+    // ── Read sector from URL ──────────────────────────────────────────────
+    const params   = new URLSearchParams(window.location.search);
+    const sectorKey = (params.get('s') || 'tech').toLowerCase();
+    const sector   = SECTORS[sectorKey] || SECTORS.tech;
+
+    // Set active tab
+    document.querySelectorAll('.sector-tab').forEach(tab => {
+      const href = tab.getAttribute('href');
+      if (href.includes(`s=${sectorKey}`) || (sectorKey === 'pharma' && href.includes('Pharma'))) {
+        tab.classList.add('active');
+      }
+    });
+
+    document.getElementById('sectorTitle').textContent    = `${sector.name} Sector`;
+    document.getElementById('sectorSubtitle').textContent = sector.subtitle;
+    document.title = `${sector.name} — StockView`;
+
+    // ── Chart state ───────────────────────────────────────────────────────
+    let chartInstance = null;
+    let lwChart       = null;
+    let activeSymbol  = null;
+    let activeValues  = null;
+    let activeName    = '';
+    let currentTF     = '3M';
+    let currentType   = 'line';
+    let showSMA       = false;
+    let showVolume    = false;
+    const TF_DAYS     = { '1W':5, '1M':21, '3M':63, '6M':126, '1Y':252 };
+
+    // Wire up controls
+    document.querySelectorAll('#tfGroup .ctrl-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#tfGroup .ctrl-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTF = btn.dataset.tf;
+        redrawChart();
+      });
+    });
+    document.querySelectorAll('#typeGroup .ctrl-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#typeGroup .ctrl-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentType = btn.dataset.type;
+        document.getElementById('smaToggle').style.display = currentType === 'line' ? '' : 'none';
+        redrawChart();
+      });
+    });
+    document.getElementById('smaToggle').addEventListener('click', () => {
+      showSMA = !showSMA;
+      document.getElementById('smaToggle').classList.toggle('active', showSMA);
+      redrawChart();
+    });
+    document.getElementById('volToggle').addEventListener('click', () => {
+      showVolume = !showVolume;
+      document.getElementById('volToggle').classList.toggle('active', showVolume);
+      redrawChart();
+    });
+
+    // ── Load stocks ───────────────────────────────────────────────────────
+    async function loadAllStocks(forceRefresh = false) {
+      clearMessages();
+      document.getElementById('stockData').innerHTML = '';
+
+      const results = sector.companies.map(c => {
+        const hit = !forceRefresh && getCached(c.symbol);
+        return hit || { symbol: c.symbol, name: c.name, pending: true };
+      });
+
+      renderTable(results);
+
+      let chartShown = false;
+      for (const r of results) {
+        if (r.values) { showEvolution(r.symbol, results); chartShown = true; break; }
+      }
+
+      const cachedCount = results.filter(r => r.fromCache).length;
+      if (cachedCount > 0) {
+        const mins = Math.round((Date.now() - results.find(r => r.fromCache).cachedAt) / 60000);
+        showCacheNotice(`${cachedCount} of ${sector.companies.length} stocks from cache (${mins} min old).`);
+      }
+
+      let fetched = 0;
+      for (let i = 0; i < results.length; i++) {
+        if (!results[i].pending) continue;
+        const company = sector.companies[i];
+        if (fetched > 0) await new Promise(r => setTimeout(r, 500));
+        fetched++;
+
+        try {
+          const url  = `https://api.twelvedata.com/time_series?symbol=${company.symbol}&interval=1day&outputsize=252&apikey=${API_KEY}`;
+          const res  = await fetch(url);
+          const data = await res.json();
+
+          if (data.status === 'error') {
+            results[i] = { symbol: company.symbol, name: company.name, error: data.code === 429 ? 'rate_limit' : 'invalid' };
+          } else if (!data.values || data.values.length === 0) {
+            results[i] = { symbol: company.symbol, name: company.name, error: 'no_data' };
+          } else {
+            localStorage.setItem(`twelvedata_${company.symbol}`, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+            results[i] = { symbol: company.symbol, name: company.name, values: data.values, fromCache: false };
+            if (!chartShown) { showEvolution(company.symbol, results); chartShown = true; }
+          }
+        } catch (_) {
+          results[i] = { symbol: company.symbol, name: company.name, error: 'network' };
+        }
+        updateTableRow(company.symbol, results[i], results);
+      }
+
+      if (results.some(r => r.error === 'rate_limit')) {
+        showError('API rate limit hit. Wait 1 minute and click Refresh.');
+      }
+    }
+
+    // ── Table rendering ───────────────────────────────────────────────────
+    function renderTable(results) {
+      const firstValid = results.find(r => r.values && r.values.length > 1);
+      let dailyRange = '', weeklyRange = '', monthlyRange = '';
+      if (firstValid) {
+        const v = firstValid.values;
+        dailyRange   = `${v[1].datetime} → ${v[0].datetime}`;
+        weeklyRange  = `${v[Math.min(5,v.length-1)].datetime} → ${v[0].datetime}`;
+        monthlyRange = `${v[Math.min(21,v.length-1)].datetime} → ${v[0].datetime}`;
+      }
+
+      document.getElementById('stockData').innerHTML = `
+        <table id="stockTable">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Price</th>
+              <th>Daily Change <span class="changeDateRange">${dailyRange}</span></th>
+              <th>Weekly Change <span class="changeDateRange">${weeklyRange}</span></th>
+              <th>Monthly Change <span class="changeDateRange">${monthlyRange}</span></th>
+            </tr>
+          </thead>
+          <tbody>${results.map(r => buildRow(r)).join('')}</tbody>
+        </table>`;
+
+      document.querySelectorAll('#stockTable tbody tr[data-symbol]').forEach(row => {
+        row.addEventListener('click', () => showEvolution(row.dataset.symbol, results));
+      });
+    }
+
+    function updateTableRow(symbol, stock, allResults) {
+      const existing = document.querySelector(`tr[data-symbol="${symbol}"], tr[data-pending="${symbol}"]`);
+      if (!existing) return;
+      const wrapper = document.createElement('tbody');
+      wrapper.innerHTML = buildRow(stock);
+      const newRow = wrapper.firstElementChild;
+      if (newRow) {
+        existing.replaceWith(newRow);
+        if (!stock.error && !stock.pending) {
+          newRow.addEventListener('click', () => showEvolution(symbol, allResults));
+        }
+      }
+    }
+
+    function buildRow(stock) {
+      if (stock.pending) return `
+        <tr data-pending="${stock.symbol}">
+          <td style="text-align:left;padding-left:12px;color:var(--muted);">
+            <span class="row-spinner"></span>${stock.name} <span style="font-size:0.85em;opacity:0.6;">${stock.symbol}</span>
+          </td>
+          <td colspan="4" style="color:var(--muted);font-size:0.85em;">Loading…</td>
+        </tr>`;
+
+      if (stock.error) {
+        const msg = { rate_limit:'Rate limit — refresh in 1 min', invalid:'Symbol not found', no_data:'No data', network:'Network error' }[stock.error] || 'Error';
+        return `<tr><td colspan="5" style="color:var(--muted);text-align:left;padding-left:12px;">${stock.name} (${stock.symbol}): ${msg}</td></tr>`;
+      }
+
+      const v = stock.values;
+      const latest = parseFloat(v[0].close);
+      const prev   = parseFloat(v[1].close);
+      const week   = parseFloat(v[Math.min(5, v.length-1)].close);
+      const month  = parseFloat(v[Math.min(21,v.length-1)].close);
+      const dChg = latest-prev, wChg = latest-week, mChg = latest-month;
+      const fmt = n => Math.abs(n).toFixed(2);
+      const pct = (c,b) => Math.abs((c/b)*100).toFixed(2);
+      const arr = n => n>0?'▲ ':n<0?'▼ ':'';
+
+      return `
+        <tr data-symbol="${stock.symbol}" title="Click to view chart">
+          <td style="text-align:left;"><strong>${stock.name}</strong> <span style="color:var(--muted);font-size:0.85em;">${stock.symbol}</span></td>
+          <td>$${latest.toFixed(2)}</td>
+          <td class="${cc(dChg)}">${arr(dChg)}$${fmt(dChg)} (${pct(dChg,prev)}%)</td>
+          <td class="${cc(wChg)}">${arr(wChg)}$${fmt(wChg)} (${pct(wChg,week)}%)</td>
+          <td class="${cc(mChg)}">${arr(mChg)}$${fmt(mChg)} (${pct(mChg,month)}%)</td>
+        </tr>`;
+    }
+
+    // ── Chart ─────────────────────────────────────────────────────────────
+    async function showEvolution(symbol, allResults) {
+      document.querySelectorAll('#stockTable tbody tr').forEach(r => r.classList.remove('active-row'));
+      const row = document.querySelector(`tr[data-symbol="${symbol}"]`);
+      if (row) row.classList.add('active-row');
+      activeSymbol = symbol;
+      let stock = allResults?.find(r => r.symbol === symbol && r.values) || getCached(symbol);
+      if (!stock || stock.error || !stock.values) return;
+      activeValues = stock.values;
+      activeName   = stock.name;
+      redrawChart();
+    }
+
+    function redrawChart() {
+      if (!activeValues) return;
+      const days     = TF_DAYS[currentTF] || 63;
+      const reversed = [...activeValues.slice(0, Math.min(days, activeValues.length))].reverse();
+      document.getElementById('chartTitle').textContent = `${activeName} (${activeSymbol}) — ${currentTF}`;
+      if (currentType === 'line') {
+        document.getElementById('lineChartWrap').style.display   = 'block';
+        document.getElementById('candleChartWrap').style.display = 'none';
+        destroyLW(); renderLineChart(reversed);
+      } else {
+        document.getElementById('lineChartWrap').style.display   = 'none';
+        document.getElementById('candleChartWrap').style.display = 'block';
+        destroyLine(); renderCandleChart(reversed);
+      }
+    }
+
+    function renderLineChart(data) {
+      destroyLine();
+      const labels  = data.map(v => v.datetime);
+      const prices  = data.map(v => parseFloat(v.close));
+      const volumes = data.map(v => parseFloat(v.volume) || 0);
+      const datasets = [{
+        label: `${activeSymbol} Close`, data: prices,
+        borderColor:'rgba(220,38,38,0.9)', backgroundColor:'rgba(220,38,38,0.08)',
+        borderWidth:2, pointRadius: data.length>60?0:2, fill:true, tension:0.3,
+        yAxisID:'price', order:2,
+      }];
+      if (showSMA && data.length >= 20) {
+        datasets.push({ label:'SMA 20', data:calculateSMA(prices,20), borderColor:'#4ade80', backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, fill:false, tension:0.3, spanGaps:true, yAxisID:'price', order:1 });
+      }
+      if (showVolume) {
+        datasets.push({ type:'bar', label:'Volume', data:volumes, backgroundColor: prices.map((p,i)=>i===0||p>=prices[i-1]?'rgba(74,222,128,0.25)':'rgba(248,113,113,0.25)'), borderColor:'transparent', yAxisID:'volume', order:3 });
+      }
+      const scales = {
+        x: { ticks:{maxTicksLimit:8,maxRotation:30,color:'#94a3b8'}, grid:{color:'rgba(51,65,85,0.6)'} },
+        price: { position:'left', ticks:{callback:v=>`$${v.toFixed(0)}`,color:'#94a3b8'}, grid:{color:'rgba(51,65,85,0.6)'} },
+      };
+      if (showVolume) scales.volume = { position:'right', display:false, max:Math.max(...volumes)*4, min:0, grid:{display:false} };
+      const ctx = document.getElementById('stockChart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type:'line', data:{labels,datasets},
+        options:{
+          responsive:true, animation:{duration:300},
+          plugins:{
+            legend:{display:showSMA||showVolume},
+            tooltip:{callbacks:{label:ctx=>ctx.dataset.yAxisID==='volume'?` Vol: ${(ctx.parsed.y/1e6).toFixed(1)}M`:` $${ctx.parsed.y.toFixed(2)}`}}
+          },
+          scales
+        }
+      });
+    }
+
+    function renderCandleChart(data) {
+      destroyLW();
+      const wrap = document.getElementById('candleChartWrap');
+      wrap.innerHTML = '';
+      requestAnimationFrame(() => {
+        const width = wrap.offsetWidth || wrap.parentElement?.offsetWidth || 760;
+        lwChart = LightweightCharts.createChart(wrap, {
+          width, height:380,
+          layout:{background:{color:'#1e293b'},textColor:'#94a3b8'},
+          grid:{vertLines:{color:'rgba(51,65,85,0.6)'},horzLines:{color:'rgba(51,65,85,0.6)'}},
+          crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+          rightPriceScale:{borderColor:'#334155'},
+          timeScale:{borderColor:'#334155'},
+        });
+        const series = lwChart.addCandlestickSeries({ upColor:'#4ade80',downColor:'#f87171',borderUpColor:'#4ade80',borderDownColor:'#f87171',wickUpColor:'#4ade80',wickDownColor:'#f87171' });
+        const clean = data.map(v=>({time:v.datetime,open:parseFloat(v.open),high:parseFloat(v.high),low:parseFloat(v.low),close:parseFloat(v.close),volume:parseFloat(v.volume)||0})).filter(v=>!isNaN(v.open));
+        series.setData(clean);
+        if (showVolume) {
+          const vs = lwChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});
+          lwChart.priceScale('vol').applyOptions({scaleMargins:{top:0.8,bottom:0},visible:false});
+          vs.setData(clean.map(v=>({time:v.time,value:v.volume,color:v.close>=v.open?'rgba(74,222,128,0.4)':'rgba(248,113,113,0.4)'})));
+        }
+        lwChart.timeScale().fitContent();
+        window.addEventListener('resize', () => { if(lwChart) lwChart.applyOptions({width:wrap.offsetWidth}); });
+      });
+    }
+
+    function calculateSMA(prices, period) {
+      return prices.map((_,i) => i<period-1?null:prices.slice(i-period+1,i+1).reduce((a,b)=>a+b,0)/period);
+    }
+    function destroyLine() { if(chartInstance){chartInstance.destroy();chartInstance=null;} }
+    function destroyLW()   { if(lwChart){lwChart.remove();lwChart=null;} }
+    function getCached(symbol) {
+      try {
+        const raw = localStorage.getItem(`twelvedata_${symbol}`);
+        if (!raw) return null;
+        const {timestamp,values} = JSON.parse(raw);
+        if (Date.now()-timestamp < CACHE_TTL) {
+          return { symbol, name:sector.companies.find(c=>c.symbol===symbol)?.name, values, fromCache:true, cachedAt:timestamp };
+        }
+      } catch(_){}
+      return null;
+    }
+    function cc(n) { return n>0?'positive':n<0?'negative':'neutral'; }
+    function showError(msg) { const el=document.getElementById('errorBanner'); el.textContent=msg; el.style.display='block'; }
+    function showCacheNotice(msg) { const el=document.getElementById('cacheNotice'); el.textContent=msg; el.style.display='block'; }
+    function clearMessages() { document.getElementById('errorBanner').style.display='none'; document.getElementById('cacheNotice').style.display='none'; }
+
+    window.onload = () => loadAllStocks(false);
+  </script>
+</body>
+</html>

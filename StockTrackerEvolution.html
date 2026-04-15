@@ -268,6 +268,8 @@
       </div>
       <!-- SMA toggle -->
       <button class="sma-btn" id="smaToggle">SMA 20</button>
+      <!-- Volume toggle -->
+      <button class="sma-btn" id="volToggle">Volume</button>
     </div>
   </div>
 
@@ -289,6 +291,7 @@
   let currentTF     = '3M';
   let currentType   = 'line';
   let showSMA       = false;
+  let showVolume    = false;
 
   const TF_DAYS = { '1W': 5, '1M': 21, '3M': 63, '6M': 126, '1Y': 252 };
 
@@ -316,6 +319,12 @@
   document.getElementById('smaToggle').addEventListener('click', () => {
     showSMA = !showSMA;
     document.getElementById('smaToggle').classList.toggle('active', showSMA);
+    redrawChart();
+  });
+
+  document.getElementById('volToggle').addEventListener('click', () => {
+    showVolume = !showVolume;
+    document.getElementById('volToggle').classList.toggle('active', showVolume);
     redrawChart();
   });
 
@@ -452,8 +461,10 @@
   function renderLineChart(data) {
     destroyLine();
 
-    const labels = data.map(v => v.datetime);
-    const prices = data.map(v => parseFloat(v.close));
+    const labels  = data.map(v => v.datetime);
+    const prices  = data.map(v => parseFloat(v.close));
+    const volumes = data.map(v => parseFloat(v.volume) || 0);
+
     const datasets = [{
       label: `${currentSymbol} Close`,
       data: prices,
@@ -463,14 +474,14 @@
       pointRadius: data.length > 60 ? 0 : 2,
       fill: true,
       tension: 0.3,
+      yAxisID: 'price',
+      order: 2,
     }];
 
-    // SMA overlay
     if (showSMA && data.length >= 20) {
-      const sma = calculateSMA(prices, 20);
       datasets.push({
         label: 'SMA 20',
-        data: sma,
+        data: calculateSMA(prices, 20),
         borderColor: '#4ade80',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
@@ -478,7 +489,47 @@
         fill: false,
         tension: 0.3,
         spanGaps: true,
+        yAxisID: 'price',
+        order: 1,
       });
+    }
+
+    if (showVolume) {
+      datasets.push({
+        type: 'bar',
+        label: 'Volume',
+        data: volumes,
+        backgroundColor: prices.map((p, i) =>
+          i === 0 || p >= prices[i - 1]
+            ? 'rgba(74,222,128,0.25)'
+            : 'rgba(248,113,113,0.25)'
+        ),
+        borderColor: 'transparent',
+        yAxisID: 'volume',
+        order: 3,
+      });
+    }
+
+    const scales = {
+      x: {
+        ticks: { maxTicksLimit: 8, maxRotation: 30, color: '#94a3b8' },
+        grid:  { color: 'rgba(51,65,85,0.6)' }
+      },
+      price: {
+        position: 'left',
+        ticks: { callback: v => `$${v.toFixed(0)}`, color: '#94a3b8' },
+        grid:  { color: 'rgba(51,65,85,0.6)' }
+      },
+    };
+
+    if (showVolume) {
+      scales.volume = {
+        position: 'right',
+        display: false,
+        max: Math.max(...volumes) * 4,
+        min: 0,
+        grid: { display: false },
+      };
     }
 
     const ctx = document.getElementById('stockChart').getContext('2d');
@@ -489,19 +540,16 @@
         responsive: true,
         animation: { duration: 300 },
         plugins: {
-          legend: { display: showSMA },
-          tooltip: { callbacks: { label: (ctx) => ` $${ctx.parsed.y.toFixed(2)}` } }
-        },
-        scales: {
-          x: {
-            ticks: { maxTicksLimit: 8, maxRotation: 30, color: '#94a3b8' },
-            grid:  { color: 'rgba(51,65,85,0.6)' }
-          },
-          y: {
-            ticks: { callback: v => `$${v.toFixed(0)}`, color: '#94a3b8' },
-            grid:  { color: 'rgba(51,65,85,0.6)' }
+          legend: { display: showSMA || showVolume },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ctx.dataset.yAxisID === 'volume'
+                ? ` Vol: ${(ctx.parsed.y / 1e6).toFixed(1)}M`
+                : ` $${ctx.parsed.y.toFixed(2)}`
+            }
           }
-        }
+        },
+        scales
       }
     });
   }
@@ -532,13 +580,33 @@
       wickDownColor:    '#f87171',
     });
 
-    candleSeries.setData(data.map(v => ({
-      time:  v.datetime,
-      open:  parseFloat(v.open),
-      high:  parseFloat(v.high),
-      low:   parseFloat(v.low),
-      close: parseFloat(v.close),
-    })));
+    const cleanData = data.map(v => ({
+      time:   v.datetime,
+      open:   parseFloat(v.open),
+      high:   parseFloat(v.high),
+      low:    parseFloat(v.low),
+      close:  parseFloat(v.close),
+      volume: parseFloat(v.volume) || 0,
+    })).filter(v => !isNaN(v.open));
+
+    candleSeries.setData(cleanData);
+
+    if (showVolume) {
+      const volSeries = lwChart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'vol',
+        color: '#4ade80',
+      });
+      lwChart.priceScale('vol').applyOptions({
+        scaleMargins: { top: 0.8, bottom: 0 },
+        visible: false,
+      });
+      volSeries.setData(cleanData.map(v => ({
+        time:  v.time,
+        value: v.volume,
+        color: v.close >= v.open ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.4)',
+      })));
+    }
 
     lwChart.timeScale().fitContent();
   }
