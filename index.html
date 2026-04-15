@@ -29,6 +29,61 @@
       line-height: 1.6;
     }
 
+    /* ── Ticker bar ─────────────────────────────────────── */
+    #tickerBar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 101;
+      height: 36px;
+      background: #080f1e;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .ticker-wrapper {
+      display: flex;
+      height: 100%;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .ticker-track {
+      display: inline-flex;
+      animation: ticker-scroll 45s linear infinite;
+      white-space: nowrap;
+    }
+    .ticker-track:hover { animation-play-state: paused; }
+
+    @keyframes ticker-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0 1.25rem;
+      font-size: 0.78rem;
+      border-right: 1px solid rgba(51,65,85,0.6);
+      cursor: pointer;
+      height: 36px;
+      transition: background 0.15s;
+    }
+    .ticker-item:hover { background: rgba(255,255,255,0.04); }
+
+    .ticker-symbol { font-weight: 700; color: var(--text); letter-spacing: 0.03em; }
+    .ticker-price  { color: var(--muted); }
+    .ticker-change { font-weight: 600; }
+    .ticker-change.up   { color: #4ade80; }
+    .ticker-change.down { color: #f87171; }
+    .ticker-change.flat { color: var(--muted); }
+
+    /* When ticker is visible, push nav + content down */
+    body.has-ticker nav      { top: 36px; }
+    body.has-ticker .hero    { padding-top: calc(8rem + 36px); }
+
     /* ── Navbar ─────────────────────────────────────────── */
     nav {
       position: fixed;
@@ -424,6 +479,15 @@
 </head>
 <body>
 
+  <!-- ── Ticker bar (logged-in only) ─────────────────────── -->
+  <div id="tickerBar">
+    <div class="ticker-wrapper">
+      <div class="ticker-track" id="tickerTrack">
+        <!-- Items injected by JS, duplicated for seamless loop -->
+      </div>
+    </div>
+  </div>
+
   <!-- ── Navbar ───────────────────────────────────────────── -->
   <nav>
     <div class="nav-inner">
@@ -655,13 +719,15 @@
         });
         if (signupBtn) signupBtn.style.display = "none";
 
-        // Load and show portfolio dashboard
+        // Load portfolio dashboard + ticker
         await loadDashboard(user.uid);
 
       } else {
         authEl.innerHTML = `<a href="login.html" style="color:var(--muted);font-size:0.85rem;text-decoration:none;">Login</a>`;
         if (signupBtn) signupBtn.style.display = "";
         document.getElementById("portfolioDashboard").style.display = "none";
+        document.getElementById("tickerBar").style.display = "none";
+        document.body.classList.remove("has-ticker");
       }
     });
 
@@ -695,6 +761,9 @@
         </div>
       `).join('');
 
+      // Collect stock data for ticker
+      const tickerData = [];
+
       // Fetch each stock and update its card
       for (const sym of watchlist) {
         const values = await fetchStock(sym);
@@ -724,7 +793,33 @@
           <div style="font-weight:700;font-size:0.95rem;margin-bottom:2px;">${sym}</div>
           <div style="font-size:1.2rem;font-weight:800;margin-bottom:4px;">$${latest.toFixed(2)}</div>
           <div style="color:${color};font-size:0.85rem;font-weight:600;">${arrow} ${Math.abs(change).toFixed(2)} (${Math.abs(pct)}%)</div>`;
+
+        // Collect for ticker
+        tickerData.push({ sym, latest, change, pct: parseFloat(pct) });
       }
+
+      // Build ticker bar once all data is ready
+      if (tickerData.length > 0) buildTicker(tickerData);
+    }
+
+    // ── Build scrolling ticker ────────────────────────────────────────────
+    function buildTicker(stocks) {
+      const makeItems = () => stocks.map(({ sym, latest, change, pct }) => {
+        const dir   = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
+        const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '—';
+        const sign  = change > 0 ? '+' : '';
+        return `
+          <div class="ticker-item" onclick="window.location.href='StockTrackerEvolution.html?symbol=${sym}'">
+            <span class="ticker-symbol">${sym}</span>
+            <span class="ticker-price">$${latest.toFixed(2)}</span>
+            <span class="ticker-change ${dir}">${arrow} ${sign}${Math.abs(change).toFixed(2)} (${sign}${pct.toFixed(2)}%)</span>
+          </div>`;
+      }).join('');
+
+      // Duplicate content for seamless loop
+      document.getElementById('tickerTrack').innerHTML = makeItems() + makeItems();
+      document.getElementById('tickerBar').style.display = 'block';
+      document.body.classList.add('has-ticker');
     }
 
     // ── Fetch with cache ─────────────────────────────────────────────────
