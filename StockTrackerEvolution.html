@@ -225,6 +225,167 @@
       overflow: hidden;
       display: none;
     }
+
+    /* ── Fundamentals card ──────────────────────────────── */
+    #fundamentalsSection { display: none; }
+
+    .fundamentals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .fund-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+    }
+
+    .fund-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .fund-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .fund-value.positive { color: #4ade80; }
+    .fund-value.negative { color: #f87171; }
+
+    .market-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .market-open   { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid #4ade80; }
+    .market-closed { background: rgba(148,163,184,0.15); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── Comparison section ─────────────────────────────── */
+    #comparisonSection { display: none; }
+
+    .comp-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .comp-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    #compareInput {
+      width: 120px;
+      padding: 7px 10px;
+      margin: 0;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+    }
+
+    .btn-comp {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 14px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.15s;
+      transform: none;
+    }
+    .btn-comp:hover { border-color: var(--accent); color: var(--accent); transform: none; }
+    .btn-comp.active { background: rgba(59,130,246,0.15); border-color: #3b82f6; color: #3b82f6; }
+
+    .btn-clear-comp {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: all 0.15s;
+      transform: none;
+      display: none;
+    }
+    .btn-clear-comp:hover { border-color: #f87171; color: #f87171; transform: none; }
+
+    .comp-note {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ── News feed ──────────────────────────────────────── */
+    #newsSection { display: none; }
+
+    .news-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .news-title { font-size: 1rem; font-weight: 700; }
+
+    .news-source-tag {
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .news-item {
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 0;
+    }
+    .news-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+    .news-item a {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      line-height: 1.4;
+      display: block;
+      margin-bottom: 4px;
+      transition: color 0.2s;
+    }
+    .news-item a:hover { color: var(--accent); }
+
+    .news-meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .news-setup {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .news-setup a { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -247,6 +408,12 @@
 
 <section id="stockData">
   <!-- Stock information will appear here -->
+</section>
+
+<!-- ── Fundamentals ── -->
+<section id="fundamentalsSection">
+  <h3 style="margin:0 0 4px;font-size:0.95rem;font-weight:700;" id="fundTitle">Key Statistics</h3>
+  <div class="fundamentals-grid" id="fundamentalsGrid"></div>
 </section>
 
 <section id="chartSection" style="display:none;">
@@ -277,11 +444,33 @@
   <div id="candleChartWrap"></div>
 </section>
 
+<!-- ── Comparison ── -->
+<section id="comparisonSection">
+  <div class="comp-row">
+    <span class="comp-label">Compare with:</span>
+    <input type="text" id="compareInput" placeholder="e.g. MSFT" maxlength="10" />
+    <button class="btn-comp" id="addCompBtn" onclick="addComparison()">Add</button>
+    <button class="btn-clear-comp" id="clearCompBtn" onclick="clearComparison()">✕ Remove</button>
+  </div>
+  <p class="comp-note">Both stocks indexed to 100 at the start of the selected timeframe.</p>
+</section>
+
+<!-- ── News feed ── -->
+<section id="newsSection">
+  <div class="news-header">
+    <span class="news-title" id="newsTitle">Latest News</span>
+    <span class="news-source-tag">Finnhub</span>
+  </div>
+  <div id="newsList"></div>
+</section>
+
 <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
 
 <script>
-  const API_KEY   = "019effbed54c4b939010eb1072ff71bc";
-  const CACHE_TTL = 60 * 60 * 1000;
+  const API_KEY      = "019effbed54c4b939010eb1072ff71bc";
+  const FINNHUB_KEY  = "";  // ← Paste your Finnhub key here (finnhub.io — free)
+  const CACHE_TTL    = 60 * 60 * 1000;
+  const NEWS_TTL     = 30 * 60 * 1000; // 30 min cache for news
 
   // ── Chart state ──────────────────────────────────────────────────────────
   let chartInstance = null;
@@ -292,6 +481,10 @@
   let currentType   = 'line';
   let showSMA       = false;
   let showVolume    = false;
+
+  // ── Comparison state ─────────────────────────────────────────────────────
+  let compValues = null;
+  let compSymbol = '';
 
   const TF_DAYS = { '1W': 5, '1M': 21, '3M': 63, '6M': 126, '1Y': 252 };
 
@@ -339,13 +532,23 @@
     document.getElementById("chartSection").style.display = "none";
     document.getElementById("cacheNotice").style.display  = "none";
 
+    // Reset comparison when new stock is searched
+    compValues = null;
+    compSymbol = '';
+    document.getElementById('clearCompBtn').style.display = 'none';
+    document.getElementById('addCompBtn').classList.remove('active');
+    document.getElementById('compareInput').value = '';
+
     try {
       const { values, fromCache, cachedAt } = await fetchWithCache(symbol, forceRefresh);
       currentValues = values;
       currentSymbol = symbol;
       updateStockData(values, symbol);
-      document.getElementById("chartSection").style.display = "block";
+      renderFundamentals(values, symbol);
+      document.getElementById("chartSection").style.display      = "block";
+      document.getElementById("comparisonSection").style.display = "block";
       redrawChart();
+      fetchNews(symbol);
 
       if (fromCache) {
         const mins = Math.round((Date.now() - cachedAt) / 60000);
@@ -437,20 +640,27 @@
   function redrawChart() {
     if (!currentValues || !currentSymbol) return;
 
-    const days    = TF_DAYS[currentTF] || 63;
-    const sliced  = currentValues.slice(0, Math.min(days, currentValues.length));
-    const reversed = [...sliced].reverse(); // oldest → newest
+    const days     = TF_DAYS[currentTF] || 63;
+    const sliced   = currentValues.slice(0, Math.min(days, currentValues.length));
+    const reversed = [...sliced].reverse();
 
-    document.getElementById('chartTitle').textContent =
-      `${currentSymbol} — ${currentTF} (${reversed.length} trading days)`;
+    const isComparing = compValues && compSymbol && currentType === 'line';
+
+    document.getElementById('chartTitle').textContent = isComparing
+      ? `${currentSymbol} vs ${compSymbol} — ${currentTF} (indexed to 100)`
+      : `${currentSymbol} — ${currentTF} (${reversed.length} trading days)`;
+
+    // Hide SMA + volume in comparison mode (doesn't make sense)
+    document.getElementById('smaToggle').style.display = isComparing ? 'none' : (currentType === 'line' ? '' : 'none');
+    document.getElementById('volToggle').style.display = isComparing ? 'none' : '';
 
     if (currentType === 'line') {
-      document.getElementById('lineChartWrap').style.display  = 'block';
+      document.getElementById('lineChartWrap').style.display   = 'block';
       document.getElementById('candleChartWrap').style.display = 'none';
       destroyLW();
-      renderLineChart(reversed);
+      renderLineChart(reversed, isComparing);
     } else {
-      document.getElementById('lineChartWrap').style.display  = 'none';
+      document.getElementById('lineChartWrap').style.display   = 'none';
       document.getElementById('candleChartWrap').style.display = 'block';
       destroyLine();
       renderCandleChart(reversed);
@@ -458,25 +668,54 @@
   }
 
   // ── Line chart ───────────────────────────────────────────────────────────
-  function renderLineChart(data) {
+  function renderLineChart(data, isComparing = false) {
     destroyLine();
 
     const labels  = data.map(v => v.datetime);
     const prices  = data.map(v => parseFloat(v.close));
     const volumes = data.map(v => parseFloat(v.volume) || 0);
 
+    // Normalize helper (index to 100 at start)
+    const normalize = (arr) => { const base = arr[0]; return arr.map(v => (v / base) * 100); };
+    const displayPrices = isComparing ? normalize(prices) : prices;
+
     const datasets = [{
-      label: `${currentSymbol} Close`,
-      data: prices,
+      label: isComparing ? `${currentSymbol} (base 100)` : `${currentSymbol} Close`,
+      data: displayPrices,
       borderColor: 'rgba(220,38,38,0.9)',
-      backgroundColor: 'rgba(220,38,38,0.08)',
+      backgroundColor: isComparing ? 'transparent' : 'rgba(220,38,38,0.08)',
       borderWidth: 2,
       pointRadius: data.length > 60 ? 0 : 2,
-      fill: true,
+      fill: !isComparing,
       tension: 0.3,
       yAxisID: 'price',
       order: 2,
     }];
+
+    // Comparison stock overlay
+    if (isComparing) {
+      const days    = TF_DAYS[currentTF] || 63;
+      const compSliced   = compValues.slice(0, Math.min(days, compValues.length));
+      const compReversed = [...compSliced].reverse();
+      const compPrices   = compReversed.map(v => parseFloat(v.close));
+      const compLabels   = compReversed.map(v => v.datetime);
+
+      // Align to primary labels (use primary labels as x-axis base)
+      const normalizedComp = normalize(compPrices);
+
+      datasets.push({
+        label: `${compSymbol} (base 100)`,
+        data: normalizedComp,
+        borderColor: '#3b82f6',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: compReversed.length > 60 ? 0 : 2,
+        fill: false,
+        tension: 0.3,
+        yAxisID: 'price',
+        order: 1,
+      });
+    }
 
     if (showSMA && data.length >= 20) {
       datasets.push({
@@ -517,12 +756,15 @@
       },
       price: {
         position: 'left',
-        ticks: { callback: v => `$${v.toFixed(0)}`, color: '#94a3b8' },
-        grid:  { color: 'rgba(51,65,85,0.6)' }
+        ticks: {
+          callback: v => isComparing ? v.toFixed(1) : `$${v.toFixed(0)}`,
+          color: '#94a3b8'
+        },
+        grid: { color: 'rgba(51,65,85,0.6)' }
       },
     };
 
-    if (showVolume) {
+    if (showVolume && !isComparing) {
       scales.volume = {
         position: 'right',
         display: false,
@@ -540,12 +782,14 @@
         responsive: true,
         animation: { duration: 300 },
         plugins: {
-          legend: { display: showSMA || showVolume },
+          legend: { display: isComparing || showSMA || showVolume },
           tooltip: {
             callbacks: {
-              label: (ctx) => ctx.dataset.yAxisID === 'volume'
-                ? ` Vol: ${(ctx.parsed.y / 1e6).toFixed(1)}M`
-                : ` $${ctx.parsed.y.toFixed(2)}`
+              label: (ctx) => {
+                if (ctx.dataset.yAxisID === 'volume') return ` Vol: ${(ctx.parsed.y / 1e6).toFixed(1)}M`;
+                if (isComparing) return ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`;
+                return ` $${ctx.parsed.y.toFixed(2)}`;
+              }
             }
           }
         },
@@ -626,6 +870,166 @@
   }
   function destroyLW() {
     if (lwChart) { lwChart.remove(); lwChart = null; }
+  }
+
+  // ── Fundamentals ─────────────────────────────────────────────────────────
+  function renderFundamentals(values, symbol) {
+    const highs   = values.map(v => parseFloat(v.high));
+    const lows    = values.map(v => parseFloat(v.low));
+    const vols    = values.map(v => parseFloat(v.volume) || 0);
+    const closes  = values.map(v => parseFloat(v.close));
+
+    const w52High  = Math.max(...highs).toFixed(2);
+    const w52Low   = Math.min(...lows).toFixed(2);
+    const avgVol   = (vols.reduce((a,b) => a+b, 0) / vols.length / 1e6).toFixed(1);
+    const latest   = closes[0];
+
+    // YTD: find first close of current year
+    const yr = new Date().getFullYear().toString();
+    const ytdEntries = values.filter(v => v.datetime.startsWith(yr));
+    const ytdStart   = ytdEntries.length ? parseFloat(ytdEntries[ytdEntries.length - 1].close) : null;
+    const ytdChg     = ytdStart ? (((latest - ytdStart) / ytdStart) * 100).toFixed(2) : null;
+
+    // Today's open, high, low
+    const todayOpen = parseFloat(values[0].open).toFixed(2);
+    const todayHigh = parseFloat(values[0].high).toFixed(2);
+    const todayLow  = parseFloat(values[0].low).toFixed(2);
+
+    // Streak: consecutive up/down days
+    let streak = 0;
+    let dir = closes[0] >= closes[1] ? 1 : -1;
+    for (let i = 0; i < closes.length - 1; i++) {
+      if ((closes[i] >= closes[i+1]) === (dir === 1)) streak++;
+      else break;
+    }
+    const streakTxt = `${streak}d ${dir > 0 ? '▲' : '▼'}`;
+
+    const stats = [
+      { label: "Today's Open",  value: `$${todayOpen}` },
+      { label: "Today's High",  value: `$${todayHigh}`, cls: 'positive' },
+      { label: "Today's Low",   value: `$${todayLow}`,  cls: 'negative' },
+      { label: '52W High',      value: `$${w52High}`,   cls: 'positive' },
+      { label: '52W Low',       value: `$${w52Low}`,    cls: 'negative' },
+      { label: 'Avg Volume',    value: `${avgVol}M` },
+      { label: 'YTD Change',    value: ytdChg ? `${ytdChg > 0 ? '+' : ''}${ytdChg}%` : 'N/A',
+        cls: ytdChg ? (ytdChg > 0 ? 'positive' : 'negative') : '' },
+      { label: 'Win Streak',    value: streakTxt, cls: dir > 0 ? 'positive' : 'negative' },
+    ];
+
+    document.getElementById('fundamentalsGrid').innerHTML = stats.map(s => `
+      <div class="fund-card">
+        <div class="fund-label">${s.label}</div>
+        <div class="fund-value ${s.cls || ''}">${s.value}</div>
+      </div>`).join('');
+
+    document.getElementById('fundamentalsSection').style.display = 'block';
+  }
+
+  // ── Comparison chart ──────────────────────────────────────────────────────
+  async function addComparison() {
+    const sym = document.getElementById('compareInput').value.trim().toUpperCase();
+    if (!sym || sym === currentSymbol) return;
+
+    const btn = document.getElementById('addCompBtn');
+    btn.textContent = '…';
+    btn.disabled = true;
+
+    try {
+      const { values } = await fetchWithCache(sym, false);
+      compValues = values;
+      compSymbol = sym;
+      document.getElementById('clearCompBtn').style.display = 'inline-block';
+      btn.classList.add('active');
+      btn.textContent = '✓ Added';
+      redrawChart();
+    } catch (e) {
+      btn.textContent = 'Not found';
+      setTimeout(() => { btn.textContent = 'Add'; btn.disabled = false; }, 2000);
+      return;
+    }
+    btn.disabled = false;
+  }
+
+  function clearComparison() {
+    compValues = null;
+    compSymbol = '';
+    document.getElementById('compareInput').value = '';
+    document.getElementById('clearCompBtn').style.display = 'none';
+    document.getElementById('addCompBtn').classList.remove('active');
+    document.getElementById('addCompBtn').textContent = 'Add';
+    redrawChart();
+  }
+
+  document.getElementById('compareInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addComparison();
+  });
+
+  // ── News feed ─────────────────────────────────────────────────────────────
+  async function fetchNews(symbol) {
+    const section = document.getElementById('newsSection');
+    const list    = document.getElementById('newsList');
+    section.style.display = 'block';
+    document.getElementById('newsTitle').textContent = `Latest News — ${symbol}`;
+
+    if (!FINNHUB_KEY) {
+      list.innerHTML = `<div class="news-setup">
+        Add your free Finnhub API key to see live news.<br>
+        Get one at <a href="https://finnhub.io" target="_blank">finnhub.io</a> (free, no credit card),
+        then paste it into the <code>FINNHUB_KEY</code> variable at the top of the script.
+      </div>`;
+      return;
+    }
+
+    // Check news cache
+    const cacheKey = `news_${symbol}`;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { timestamp, articles } = JSON.parse(cached);
+        if (Date.now() - timestamp < NEWS_TTL) {
+          renderNews(articles);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    list.innerHTML = `<div style="color:var(--muted);font-size:0.88rem;padding:1rem 0;">Loading news…</div>`;
+
+    try {
+      const to   = new Date().toISOString().split('T')[0];
+      const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const url  = `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
+      const res  = await fetch(url);
+      const data = await res.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = `<div style="color:var(--muted);font-size:0.88rem;padding:1rem 0;">No recent news found for ${symbol}.</div>`;
+        return;
+      }
+
+      const articles = data.slice(0, 5);
+      localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), articles }));
+      renderNews(articles);
+
+    } catch (_) {
+      list.innerHTML = `<div style="color:var(--muted);font-size:0.88rem;padding:1rem 0;">Could not load news.</div>`;
+    }
+  }
+
+  function renderNews(articles) {
+    const list = document.getElementById('newsList');
+    list.innerHTML = articles.map(a => {
+      const date = new Date(a.datetime * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return `
+        <div class="news-item">
+          <a href="${a.url}" target="_blank" rel="noopener">${a.headline}</a>
+          <div class="news-meta">
+            <span>${a.source}</span>
+            <span>·</span>
+            <span>${date}</span>
+          </div>
+        </div>`;
+    }).join('');
   }
 
   // ── Misc helpers ─────────────────────────────────────────────────────────
