@@ -997,10 +997,18 @@
 
     try {
       const to   = new Date().toISOString().split('T')[0];
-      const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const url  = `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
+
       const res  = await fetch(url);
       const data = await res.json();
+
+      console.log(`[News] ${symbol}:`, data);
+
+      if (data.error) {
+        list.innerHTML = `<div style="color:#f87171;font-size:0.88rem;padding:1rem 0;">API error: ${data.error}</div>`;
+        return;
+      }
 
       if (!Array.isArray(data) || data.length === 0) {
         list.innerHTML = `<div style="color:var(--muted);font-size:0.88rem;padding:1rem 0;">No recent news found for ${symbol}.</div>`;
@@ -1011,8 +1019,9 @@
       localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), articles }));
       renderNews(articles);
 
-    } catch (_) {
-      list.innerHTML = `<div style="color:var(--muted);font-size:0.88rem;padding:1rem 0;">Could not load news.</div>`;
+    } catch (err) {
+      console.error('[News] fetch error:', err);
+      list.innerHTML = `<div style="color:var(--muted);font-size:0.88rem;padding:1rem 0;">Could not load news. Check console for details.</div>`;
     }
   }
 
