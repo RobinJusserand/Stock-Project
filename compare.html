@@ -513,21 +513,28 @@
 
   // ── Portfolio line calculation ────────────────────────────────────────────
   function calcLine(stocksData, numDays) {
-    const normalized = stocksData.map(stock => {
-      const data   = [...stock.values].reverse();
+    // Build per-stock date→value maps (each stock normalized to 100 at its own start)
+    const stockMaps = stocksData.map(stock => {
+      const data   = [...stock.values].reverse(); // oldest first
       const capped = data.slice(Math.max(0, data.length - numDays));
       if (capped.length < 2) return null;
       const base = parseFloat(capped[0].close);
-      return capped.map(v => ({ date: v.datetime, value: (parseFloat(v.close) / base) * 100 }));
+      return new Map(capped.map(v => [v.datetime, (parseFloat(v.close) / base) * 100]));
     }).filter(Boolean);
 
-    if (normalized.length < 2) return [];
+    if (stockMaps.length === 0) return [];
 
-    const minLen = Math.min(...normalized.map(s => s.length));
-    return normalized[0].slice(0, minLen).map((point, i) => {
-      const vals = normalized.map(s => s[i]?.value).filter(v => v != null && !isNaN(v));
-      if (!vals.length) return null;
-      return { time: point.date, value: vals.reduce((a, b) => a + b, 0) / vals.length };
+    // Union of all dates, sorted chronologically
+    const allDates = [...new Set(stockMaps.flatMap(m => [...m.keys()]))].sort();
+
+    // For each date, average stocks that have data
+    // Require at least 50% of stocks to have data (avoids misleading early averages)
+    const minCoverage = Math.ceil(stockMaps.length * 0.5);
+
+    return allDates.map(date => {
+      const vals = stockMaps.map(m => m.get(date)).filter(v => v != null && !isNaN(v));
+      if (vals.length < minCoverage) return null;
+      return { time: date, value: vals.reduce((a, b) => a + b, 0) / vals.length };
     }).filter(Boolean);
   }
 
