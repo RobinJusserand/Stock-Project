@@ -83,6 +83,11 @@
     .sma-btn.active { background:rgba(74,222,128,0.15); border-color:#4ade80; color:#4ade80; }
     #lineChartWrap canvas { width:100% !important; }
     #candleChartWrap { height:380px; border-radius:8px; overflow:hidden; display:none; }
+    .chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem; }
+    @media (max-width:680px) { .chart-grid { grid-template-columns:1fr; } }
+    .chart-panel-title { font-size:0.85rem; font-weight:700; color:var(--text); margin-bottom:2px; }
+    .chart-panel-sub   { font-size:0.72rem; color:var(--muted); margin-bottom:8px; }
+    #sectorChartWrap   { border-radius:8px; overflow:hidden; }
   </style>
 </head>
 <body>
@@ -115,10 +120,7 @@
 
   <section id="chartSection">
     <div class="chart-header">
-      <div>
-        <h2 id="chartTitle" style="margin:0;">Stock Evolution</h2>
-        <p id="chartSubtitle" style="font-size:0.85em;color:var(--muted);margin:4px 0 0;">Click a row above to view its price history.</p>
-      </div>
+      <div><h2 style="margin:0;font-size:1rem;" id="sectorChartLabel">Charts</h2></div>
       <div class="chart-controls">
         <div class="ctrl-group" id="tfGroup">
           <button class="ctrl-btn" data-tf="1W">1W</button>
@@ -135,8 +137,20 @@
         <button class="sma-btn" id="volToggle">Volume</button>
       </div>
     </div>
-    <div id="lineChartWrap"><canvas id="stockChart"></canvas></div>
-    <div id="candleChartWrap"></div>
+
+    <div class="chart-grid">
+      <div>
+        <div class="chart-panel-title" id="chartTitle">Stock Evolution</div>
+        <div class="chart-panel-sub" id="chartSubtitle">Click a row above to view its price history.</div>
+        <div id="lineChartWrap"><canvas id="stockChart"></canvas></div>
+        <div id="candleChartWrap"></div>
+      </div>
+      <div>
+        <div class="chart-panel-title" id="aggregateTitle">Sector Aggregate</div>
+        <div class="chart-panel-sub">Equal-weighted · Indexed to 100</div>
+        <div id="sectorChartWrap"></div>
+      </div>
+    </div>
   </section>
 
   <button id="homeButton" onclick="window.location.href='index.html'">Home</button>
@@ -226,6 +240,7 @@
         btn.classList.add('active');
         currentTF = btn.dataset.tf;
         redrawChart();
+        drawSectorChart();
       });
     });
     document.querySelectorAll('#typeGroup .ctrl-btn').forEach(btn => {
@@ -301,6 +316,8 @@
       if (results.some(r => r.error === 'rate_limit')) {
         showError('API rate limit hit. Wait 1 minute and click Refresh.');
       }
+
+      renderSectorAggregate(results);
     }
 
     // ── Table rendering ───────────────────────────────────────────────────
@@ -493,6 +510,85 @@
     function showError(msg) { const el=document.getElementById('errorBanner'); el.textContent=msg; el.style.display='block'; }
     function showCacheNotice(msg) { const el=document.getElementById('cacheNotice'); el.textContent=msg; el.style.display='block'; }
     function clearMessages() { document.getElementById('errorBanner').style.display='none'; document.getElementById('cacheNotice').style.display='none'; }
+
+    // ── Sector aggregate chart ──────────────────────────────────────────────
+    let sectorChartInst = null;
+    let allResultsCache = null;
+
+    function renderSectorAggregate(results) {
+      allResultsCache = results;
+      document.getElementById('aggregateTitle').textContent = `${sector.name} Sector — Aggregate`;
+      drawSectorChart();
+    }
+
+    function drawSectorChart() {
+      if (!allResultsCache) return;
+      const stocksData = allResultsCache
+        .filter(r => r.values && r.values.length > 2)
+        .map(r => ({ symbol: r.symbol, values: r.values }));
+      if (stocksData.length < 2) return;
+
+      const days = TF_DAYS[currentTF] || 63;
+      const line = calcAggregateLine(stocksData, days);
+      if (line.length < 2) return;
+
+      if (sectorChartInst) { sectorChartInst.destroy(); sectorChartInst = null; }
+
+      const ctx = document.createElement('canvas');
+      const wrap = document.getElementById('sectorChartWrap');
+      wrap.innerHTML = '';
+      wrap.appendChild(ctx);
+
+      const values    = line.map(p => p.value);
+      const pctChange = ((values[values.length-1] - values[0]) / values[0] * 100).toFixed(2);
+
+      // Use each sector's brand color
+      const colorMap = { tech:'rgba(59,130,246,0.9)', finance:'rgba(245,158,11,0.9)', energy:'rgba(16,185,129,0.9)', pharma:'rgba(168,85,247,0.9)' };
+      const lineColor = colorMap[sectorKey] || 'rgba(148,163,184,0.9)';
+
+      sectorChartInst = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: line.map(p => p.time),
+          datasets: [{
+            label: `${sector.name} (${pctChange >= 0 ? '+' : ''}${pctChange}%)`,
+            data: values,
+            borderColor: lineColor,
+            backgroundColor: lineColor.replace('0.9)', '0.06)'),
+            borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3,
+          }]
+        },
+        options: {
+          responsive: true, animation: { duration: 200 },
+          plugins: {
+            legend: { display: true, labels: { color: '#94a3b8', boxWidth: 12 } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(2)}` } }
+          },
+          scales: {
+            x: { ticks: { maxTicksLimit: 6, color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.5)' } },
+            y: { ticks: { callback: v => v.toFixed(0), color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.5)' } }
+          }
+        }
+      });
+    }
+
+    function calcAggregateLine(stocksData, numDays) {
+      const stockMaps = stocksData.map(stock => {
+        const data   = [...stock.values].reverse();
+        const capped = data.slice(Math.max(0, data.length - numDays));
+        if (capped.length < 2) return null;
+        const base = parseFloat(capped[0].close);
+        return new Map(capped.map(v => [v.datetime, (parseFloat(v.close) / base) * 100]));
+      }).filter(Boolean);
+      if (stockMaps.length < 2) return [];
+      const allDates    = [...new Set(stockMaps.flatMap(m => [...m.keys()]))].sort();
+      const minCoverage = Math.ceil(stockMaps.length * 0.5);
+      return allDates.map(date => {
+        const vals = stockMaps.map(m => m.get(date)).filter(v => v != null && !isNaN(v));
+        if (vals.length < minCoverage) return null;
+        return { time: date, value: vals.reduce((a, b) => a + b, 0) / vals.length };
+      }).filter(Boolean);
+    }
 
     window.onload = () => loadAllStocks(false);
   </script>

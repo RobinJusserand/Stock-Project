@@ -367,6 +367,23 @@
     .perf-tf-btn:hover  { background: var(--surface2); color: var(--text); transform: none; }
     .perf-tf-btn.active { background: var(--accent); color: white; }
     #perfChart { height: 200px; border-radius: 6px; overflow: hidden; }
+
+    /* 2-panel layout */
+    .perf-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 640px) { .perf-grid { grid-template-columns: 1fr; } }
+
+    .perf-panel-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 2px; }
+    .perf-panel-sub   { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
+    #stockChartWrap   { height: 200px; border-radius: 6px; overflow: hidden; display: none; }
+
+    /* Clickable stock cards */
+    .stock-card { cursor: pointer; }
+    .stock-card.active { border-color: var(--accent); background: rgba(220,38,38,0.06); }
+
     .perf-change {
       font-size: 0.82rem;
       font-weight: 600;
@@ -443,8 +460,19 @@
             <button class="perf-tf-btn" data-ptf="1Y">1Y</button>
           </div>
         </div>
-        <div id="perfChart"></div>
-        <div class="perf-change" id="perfChange"></div>
+        <div class="perf-grid">
+          <div>
+            <div class="perf-panel-title" id="perfPanelTitle">Portfolio</div>
+            <div class="perf-panel-sub">Equal-weighted · Indexed to 100</div>
+            <div id="perfChart"></div>
+            <div class="perf-change" id="perfChange"></div>
+          </div>
+          <div>
+            <div class="perf-panel-title" id="stockPanelTitle" style="color:var(--muted);">Selected Stock</div>
+            <div class="perf-panel-sub">Click any stock card below to view</div>
+            <div id="stockChartWrap"></div>
+          </div>
+        </div>
         <a href="compare.html" class="perf-compare-link">
           <i class="fa fa-chart-line"></i> Compare against sectors →
         </a>
@@ -613,8 +641,61 @@
     }
 
     function rewireRemoveBtn(symbol) {
-      const btn = document.querySelector(`[data-symbol="${symbol}"]`);
-      if (btn) btn.addEventListener("click", () => removeStock(symbol));
+      const btn  = document.querySelector(`[data-symbol="${symbol}"]`);
+      const card = document.getElementById(`card-${symbol}`);
+      if (btn)  btn.addEventListener("click",  (e) => { e.stopPropagation(); removeStock(symbol); });
+      if (card) card.addEventListener("click", ()  => showStockChart(symbol));
+    }
+
+    // ── Individual stock chart ─────────────────────────────────────────────
+    let stockChartInst  = null;
+    let activeStockSym  = null;
+
+    function showStockChart(symbol) {
+      // Highlight active card
+      document.querySelectorAll('.stock-card').forEach(c => c.classList.remove('active'));
+      const card = document.getElementById(`card-${symbol}`);
+      if (card) card.classList.add('active');
+
+      activeStockSym = symbol;
+      document.getElementById('stockPanelTitle').textContent = symbol;
+      document.getElementById('stockPanelTitle').style.color = 'var(--text)';
+
+      const cached = localStorage.getItem(`twelvedata_${symbol}`);
+      if (!cached) return;
+      const { values } = JSON.parse(cached);
+      if (!values || values.length < 2) return;
+
+      const days     = TF_DAYS_PERF[perfTF] || 21;
+      const data     = [...values].reverse().slice(Math.max(0, values.length - days));
+      const labels   = data.map(v => v.datetime);
+      const prices   = data.map(v => parseFloat(v.close));
+      const pct      = ((prices[prices.length-1] - prices[0]) / prices[0] * 100).toFixed(2);
+      const color    = pct >= 0 ? 'rgba(220,38,38,0.9)' : 'rgba(248,113,113,0.9)';
+
+      if (stockChartInst) { stockChartInst.destroy(); stockChartInst = null; }
+
+      const wrap = document.getElementById('stockChartWrap');
+      wrap.style.display = 'block';
+      wrap.innerHTML = '';
+
+      requestAnimationFrame(() => {
+        const width = wrap.offsetWidth || 300;
+        const lw = LightweightCharts.createChart(wrap, {
+          width, height: 200,
+          layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
+          grid: { vertLines: { color: 'rgba(51,65,85,0.4)' }, horzLines: { color: 'rgba(51,65,85,0.4)' } },
+          rightPriceScale: { borderColor: '#334155' },
+          timeScale: { borderColor: '#334155' },
+          handleScroll: false, handleScale: false,
+        });
+        stockChartInst = lw;
+        const series = lw.addLineSeries({ color, lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
+        series.setData(data.map(v => ({ time: v.datetime, value: parseFloat(v.close) })));
+        lw.timeScale().fitContent();
+        document.getElementById('stockPanelTitle').textContent = `${symbol} (${pct >= 0 ? '+' : ''}${pct}%)`;
+        window.addEventListener('resize', () => { if (stockChartInst) stockChartInst.applyOptions({ width: wrap.offsetWidth }); });
+      });
     }
 
     // ── Fetch stock data (with cache) ───────────────────────────────────────
@@ -747,6 +828,7 @@
         btn.classList.add('active');
         perfTF = btn.dataset.ptf;
         renderPortfolioPerformance();
+        if (activeStockSym) showStockChart(activeStockSym);
       });
     });
 
@@ -773,6 +855,7 @@
 
       // Update title with portfolio name
       document.getElementById('perfTitle').textContent = portfolioName + ' — Performance';
+      document.getElementById('perfPanelTitle').textContent = portfolioName;
 
       // % change over period
       const startVal = line[0].value;
