@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Portfolio — StockView</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -327,6 +328,61 @@
     .btn-primary:hover { background: var(--accent-h); }
 
     #mainContent { display: none; }
+
+    /* ── Performance chart ── */
+    #perfSection {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+    .perf-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .perf-title    { font-size: 0.95rem; font-weight: 700; }
+    .perf-subtitle { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .perf-tf-group {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .perf-tf-btn {
+      background: none; border: none;
+      color: var(--muted);
+      padding: 4px 10px;
+      font-size: 0.78rem; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      transform: none;
+    }
+    .perf-tf-btn:hover  { background: var(--surface2); color: var(--text); transform: none; }
+    .perf-tf-btn.active { background: var(--accent); color: white; }
+    #perfChart { height: 200px; border-radius: 6px; overflow: hidden; }
+    .perf-change {
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+    .perf-compare-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.78rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-top: 0.75rem;
+      font-weight: 600;
+    }
+    .perf-compare-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -339,6 +395,7 @@
         <a href="index.html"><i class="fa fa-house"></i> Home</a>
         <a href="StockTrackerEvolution.html">Tracker</a>
         <a href="Top 8 Pharma.html">Pharma</a>
+        <a href="compare.html">Compare</a>
         <a href="#" id="logoutLink" style="color:var(--accent);">Logout</a>
       </div>
     </div>
@@ -369,6 +426,28 @@
           <button class="btn-save-name" onclick="saveName()">Save</button>
           <button class="btn-cancel-name" onclick="cancelEditName()">Cancel</button>
         </div>
+      </div>
+
+      <!-- ── Portfolio Performance Chart ── -->
+      <div id="perfSection">
+        <div class="perf-header">
+          <div>
+            <div class="perf-title" id="perfTitle">Portfolio Performance</div>
+            <div class="perf-subtitle">Equal-weighted · Indexed to 100</div>
+          </div>
+          <div class="perf-tf-group">
+            <button class="perf-tf-btn" data-ptf="1W">1W</button>
+            <button class="perf-tf-btn active" data-ptf="1M">1M</button>
+            <button class="perf-tf-btn" data-ptf="3M">3M</button>
+            <button class="perf-tf-btn" data-ptf="6M">6M</button>
+            <button class="perf-tf-btn" data-ptf="1Y">1Y</button>
+          </div>
+        </div>
+        <div id="perfChart"></div>
+        <div class="perf-change" id="perfChange"></div>
+        <a href="compare.html" class="perf-compare-link">
+          <i class="fa fa-chart-line"></i> Compare against sectors →
+        </a>
       </div>
 
       <!-- Add stock -->
@@ -488,8 +567,9 @@
         </div>
       `).join('');
 
-      // Fetch each stock progressively
-      watchlist.forEach(sym => fetchAndRenderStock(sym));
+      // Fetch each stock progressively, then render performance chart
+      Promise.all(watchlist.map(sym => fetchAndRenderStock(sym)))
+        .then(() => renderPortfolioPerformance());
     }
 
     async function fetchAndRenderStock(symbol) {
@@ -655,6 +735,108 @@
     document.getElementById("nameInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") window.saveName();
     });
+
+    // ── Portfolio Performance Chart ────────────────────────────────────────
+    const TF_DAYS_PERF = { '1W': 5, '1M': 21, '3M': 63, '6M': 126, '1Y': 252 };
+    let perfTF    = '1M';
+    let perfChart = null;
+
+    document.querySelectorAll('.perf-tf-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.perf-tf-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        perfTF = btn.dataset.ptf;
+        renderPortfolioPerformance();
+      });
+    });
+
+    function renderPortfolioPerformance() {
+      if (watchlist.length < 2) {
+        document.getElementById('perfSection').style.display = 'none';
+        return;
+      }
+
+      const stocksData = watchlist.map(sym => {
+        try {
+          const raw = localStorage.getItem(`twelvedata_${sym}`);
+          if (!raw) return null;
+          const { values } = JSON.parse(raw);
+          return { symbol: sym, values };
+        } catch (_) { return null; }
+      }).filter(Boolean);
+
+      if (stocksData.length < 2) return;
+
+      const days = TF_DAYS_PERF[perfTF] || 21;
+      const line = calcPortfolioLine(stocksData, days);
+      if (line.length < 2) return;
+
+      // Update title with portfolio name
+      document.getElementById('perfTitle').textContent = portfolioName + ' — Performance';
+
+      // % change over period
+      const startVal = line[0].value;
+      const endVal   = line[line.length - 1].value;
+      const changePct = ((endVal - startVal) / startVal * 100).toFixed(2);
+      const changeEl  = document.getElementById('perfChange');
+      changeEl.textContent = `${changePct > 0 ? '+' : ''}${changePct}% over ${perfTF}`;
+      changeEl.style.color = changePct >= 0 ? '#4ade80' : '#f87171';
+
+      document.getElementById('perfSection').style.display = 'block';
+
+      // Draw chart
+      const container = document.getElementById('perfChart');
+      container.innerHTML = '';
+      if (perfChart) { perfChart.remove(); perfChart = null; }
+
+      requestAnimationFrame(() => {
+        const width = container.offsetWidth || container.parentElement?.offsetWidth || 600;
+        perfChart = LightweightCharts.createChart(container, {
+          width, height: 200,
+          layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
+          grid: { vertLines: { color: 'rgba(51,65,85,0.4)' }, horzLines: { color: 'rgba(51,65,85,0.4)' } },
+          rightPriceScale: { borderColor: '#334155' },
+          timeScale: { borderColor: '#334155' },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+          handleScroll: false,
+          handleScale:  false,
+        });
+
+        const series = perfChart.addLineSeries({
+          color: '#dc2626',
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          priceFormat: { type: 'custom', formatter: v => v.toFixed(1) },
+        });
+
+        series.setData(line);
+        perfChart.timeScale().fitContent();
+
+        window.addEventListener('resize', () => {
+          if (perfChart) perfChart.applyOptions({ width: container.offsetWidth });
+        });
+      });
+    }
+
+    function calcPortfolioLine(stocksData, numDays) {
+      const normalized = stocksData.map(stock => {
+        const data   = [...stock.values].reverse();
+        const capped = data.slice(Math.max(0, data.length - numDays));
+        if (capped.length < 2) return null;
+        const base = parseFloat(capped[0].close);
+        return capped.map(v => ({ date: v.datetime, value: (parseFloat(v.close) / base) * 100 }));
+      }).filter(Boolean);
+
+      if (normalized.length < 2) return [];
+
+      const minLen = Math.min(...normalized.map(s => s.length));
+      return normalized[0].slice(0, minLen).map((point, i) => {
+        const vals = normalized.map(s => s[i]?.value).filter(v => v != null && !isNaN(v));
+        if (!vals.length) return null;
+        return { time: point.date, value: vals.reduce((a, b) => a + b, 0) / vals.length };
+      }).filter(Boolean);
+    }
   </script>
 
 </body>

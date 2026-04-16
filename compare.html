@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compare Portfolios — StockView</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #263346;
+      --accent:   #dc2626;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --border:   #334155;
+      --radius:   10px;
+    }
+
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Navbar */
+    nav {
+      position: sticky; top: 0;
+      background: rgba(15,23,42,0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      height: 60px;
+      display: flex; align-items: center;
+      padding: 0 2rem; z-index: 50;
+    }
+    .nav-inner { max-width: 1000px; width: 100%; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-size: 1.2rem; font-weight: 800; text-decoration: none; color: var(--text); }
+    .nav-logo span { color: var(--accent); }
+    .nav-right { display: flex; gap: 1.25rem; align-items: center; }
+    .nav-right a { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color 0.2s; }
+    .nav-right a:hover { color: var(--text); }
+
+    /* Page */
+    .page { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    .page-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.4rem; }
+    .page-title { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.4rem; }
+    .page-sub   { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+    /* Portfolio cards */
+    .portfolio-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .port-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      user-select: none;
+    }
+    .port-card:hover { transform: translateY(-2px); }
+    .port-card.selected { background: var(--surface2); }
+    .port-card.disabled { opacity: 0.4; cursor: not-allowed; }
+    .port-card.disabled:hover { transform: none; }
+
+    .port-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .port-name { font-size: 0.9rem; font-weight: 700; margin-bottom: 3px; }
+    .port-count { font-size: 0.75rem; color: var(--muted); }
+    .port-locked { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+    /* Controls */
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .tf-group {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .tf-btn {
+      background: none; border: none;
+      color: var(--muted);
+      padding: 6px 13px;
+      font-size: 0.82rem; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      transform: none;
+    }
+    .tf-btn:hover  { background: var(--surface2); color: var(--text); transform: none; }
+    .tf-btn.active { background: var(--accent); color: white; }
+
+    .selected-count { font-size: 0.82rem; color: var(--muted); }
+    .selected-count span { color: var(--text); font-weight: 700; }
+
+    /* Loading */
+    #loadingBar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: none;
+    }
+    .load-item { display: flex; align-items: center; gap: 0.5rem; margin: 3px 0; }
+    .load-dot  {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .load-dot.spinning {
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+      background: none;
+      width: 10px; height: 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Chart */
+    #chartSection {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+    #chartSection canvas { width: 100% !important; }
+
+    /* Performance table */
+    #perfTable {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: none;
+    }
+    .perf-table-inner { width: 100%; border-collapse: collapse; }
+    .perf-table-inner th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 14px;
+      text-align: center;
+    }
+    .perf-table-inner th:first-child { text-align: left; }
+    .perf-table-inner td {
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+    .perf-table-inner td:first-child { text-align: left; font-weight: 700; }
+    .up   { color: #4ade80; font-weight: 600; }
+    .down { color: #f87171; font-weight: 600; }
+
+    /* Empty state */
+    #emptyState {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+    }
+    #emptyState i { font-size: 2.5rem; opacity: 0.3; margin-bottom: 1rem; }
+    #emptyState p { font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">Stock<span>View</span></a>
+    <div class="nav-right">
+      <a href="index.html">Home</a>
+      <a href="portfolio.html">My Portfolio</a>
+      <a href="sector.html?s=tech">Sectors</a>
+      <a href="StockTrackerEvolution.html">Tracker</a>
+    </div>
+  </div>
+</nav>
+
+<div class="page">
+
+  <div class="page-label">Analysis</div>
+  <h1 class="page-title">Compare Portfolios</h1>
+  <p class="page-sub">Select 2 or more portfolios to compare their performance over time — indexed to 100 at the start of the period.</p>
+
+  <!-- Portfolio selector -->
+  <div class="portfolio-grid" id="portfolioGrid"></div>
+
+  <!-- Controls -->
+  <div class="controls-row">
+    <div class="tf-group" id="tfGroup">
+      <button class="tf-btn" data-tf="1W">1W</button>
+      <button class="tf-btn" data-tf="1M">1M</button>
+      <button class="tf-btn active" data-tf="3M">3M</button>
+      <button class="tf-btn" data-tf="6M">6M</button>
+      <button class="tf-btn" data-tf="1Y">1Y</button>
+    </div>
+    <span class="selected-count" id="selectedCount"><span>0</span> portfolios selected</span>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingBar"></div>
+
+  <!-- Empty state -->
+  <div id="emptyState">
+    <i class="fa fa-chart-line"></i>
+    <p>Select at least 2 portfolios above to start comparing.</p>
+  </div>
+
+  <!-- Chart -->
+  <div id="chartSection">
+    <canvas id="compChart" height="400"></canvas>
+  </div>
+
+  <!-- Performance table -->
+  <div id="perfTable">
+    <table class="perf-table-inner">
+      <thead>
+        <tr>
+          <th>Portfolio</th>
+          <th>Start</th>
+          <th>Latest</th>
+          <th>Change</th>
+          <th>% Change</th>
+        </tr>
+      </thead>
+      <tbody id="perfTableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script type="module">
+  import { initializeApp }                        from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged }          from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc }            from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBLf_Pooc_64xVv9P9typnp0GilbhIb5Zw",
+    authDomain:        "stockproject-a8dd8.firebaseapp.com",
+    projectId:         "stockproject-a8dd8",
+    storageBucket:     "stockproject-a8dd8.firebasestorage.app",
+    messagingSenderId: "682770169508",
+    appId:             "1:682770169508:web:b70bcfe161685331123031"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  const API_KEY  = "019effbed54c4b939010eb1072ff71bc";
+  const CACHE_TTL = 60 * 60 * 1000;
+  const TF_DAYS   = { '1W': 5, '1M': 21, '3M': 63, '6M': 126, '1Y': 252 };
+
+  // ── Portfolio definitions ──────────────────────────────────────────────────
+  const PORTFOLIOS = {
+    mine:    { name: 'My Portfolio', color: '#dc2626', icon: 'fa-user',           symbols: [], requiresAuth: true },
+    pharma:  { name: 'Pharma',       color: '#a855f7', icon: 'fa-pills',          symbols: ['LLY','NVO','JNJ','MRK','AZN','NVS','PFE','SNY'] },
+    tech:    { name: 'Tech',         color: '#3b82f6', icon: 'fa-microchip',      symbols: ['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','ORCL'] },
+    finance: { name: 'Finance',      color: '#f59e0b', icon: 'fa-building-columns', symbols: ['JPM','BAC','GS','MS','WFC','BLK','V','MA'] },
+    energy:  { name: 'Energy',       color: '#10b981', icon: 'fa-bolt',           symbols: ['XOM','CVX','SHEL','BP','TTE','COP','SLB','EOG'] },
+  };
+
+  let selected  = new Set(['pharma', 'tech']); // default selection
+  let currentTF = '3M';
+  let chartInst = null;
+  let userLoggedIn  = false;
+  let userWatchlist = [];
+  let userPortName  = 'My Portfolio';
+
+  // ── Firebase auth ─────────────────────────────────────────────────────────
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      userLoggedIn = true;
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (snap.exists()) {
+        const data = snap.data();
+        userWatchlist = data.watchlist || [];
+        userPortName  = data.portfolioName || 'My Portfolio';
+        PORTFOLIOS.mine.symbols = userWatchlist;
+        PORTFOLIOS.mine.name    = userPortName;
+      }
+    }
+    buildGrid();
+    runComparison();
+  });
+
+  // ── Build portfolio selector ───────────────────────────────────────────────
+  function buildGrid() {
+    const grid = document.getElementById('portfolioGrid');
+    grid.innerHTML = Object.entries(PORTFOLIOS).map(([key, p]) => {
+      const isDisabled = p.requiresAuth && !userLoggedIn;
+      const isSelected = selected.has(key) && !isDisabled;
+      const borderColor = isSelected ? p.color : 'var(--border)';
+      const bgTint      = isSelected ? `rgba(${hexToRgb(p.color)},0.1)` : '';
+
+      return `<div class="port-card ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}"
+                   data-key="${key}"
+                   style="border-color:${borderColor};${bgTint ? `background:${bgTint};` : ''}">
+        <div class="port-name">
+          <span class="port-dot" style="background:${p.color}"></span>${p.name}
+        </div>
+        <div class="port-count">${p.symbols.length} stocks</div>
+        ${isDisabled ? '<div class="port-locked"><i class="fa fa-lock"></i> Log in to unlock</div>' : ''}
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.port-card:not(.disabled)').forEach(card => {
+      card.addEventListener('click', () => {
+        const key = card.dataset.key;
+        if (selected.has(key)) selected.delete(key);
+        else selected.add(key);
+        buildGrid();
+        updateSelectedCount();
+        runComparison();
+      });
+    });
+
+    updateSelectedCount();
+  }
+
+  function updateSelectedCount() {
+    const n = [...selected].filter(k => !PORTFOLIOS[k].requiresAuth || userLoggedIn).length;
+    document.getElementById('selectedCount').innerHTML = `<span>${n}</span> portfolio${n !== 1 ? 's' : ''} selected`;
+  }
+
+  // ── Timeframe buttons ─────────────────────────────────────────────────────
+  document.querySelectorAll('#tfGroup .tf-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#tfGroup .tf-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTF = btn.dataset.tf;
+      runComparison();
+    });
+  });
+
+  // ── Main comparison flow ──────────────────────────────────────────────────
+  async function runComparison() {
+    const activeKeys = [...selected].filter(k => {
+      const p = PORTFOLIOS[k];
+      return p.symbols.length > 0 && (!p.requiresAuth || userLoggedIn);
+    });
+
+    if (activeKeys.length < 2) {
+      document.getElementById('emptyState').style.display   = 'block';
+      document.getElementById('chartSection').style.display = 'none';
+      document.getElementById('perfTable').style.display    = 'none';
+      document.getElementById('loadingBar').style.display   = 'none';
+      return;
+    }
+
+    document.getElementById('emptyState').style.display = 'none';
+
+    // For each portfolio, collect cached + uncached symbols
+    const needFetch = new Set();
+    for (const key of activeKeys) {
+      for (const sym of PORTFOLIOS[key].symbols) {
+        if (!getCached(sym)) needFetch.add(sym);
+      }
+    }
+
+    if (needFetch.size > 0) {
+      showLoading(needFetch);
+      await fetchMissing([...needFetch]);
+      hideLoading();
+    }
+
+    // Calculate lines and render
+    const lines = {};
+    for (const key of activeKeys) {
+      const stocksData = PORTFOLIOS[key].symbols.map(sym => {
+        const c = getCached(sym);
+        return c ? { symbol: sym, values: c } : null;
+      }).filter(Boolean);
+
+      if (stocksData.length < 2) continue;
+      const days = TF_DAYS[currentTF] || 63;
+      lines[key] = calcLine(stocksData, days);
+    }
+
+    drawChart(lines, activeKeys);
+    drawTable(lines, activeKeys);
+  }
+
+  // ── Fetch missing symbols ─────────────────────────────────────────────────
+  async function fetchMissing(symbols) {
+    for (let i = 0; i < symbols.length; i++) {
+      const sym = symbols[i];
+      updateLoadingItem(sym, 'loading');
+      try {
+        const url  = `https://api.twelvedata.com/time_series?symbol=${sym}&interval=1day&outputsize=252&apikey=${API_KEY}`;
+        const res  = await fetch(url);
+        const data = await res.json();
+        if (data.values && data.values.length > 0) {
+          localStorage.setItem(`twelvedata_${sym}`, JSON.stringify({ timestamp: Date.now(), values: data.values }));
+          updateLoadingItem(sym, 'done');
+        } else {
+          updateLoadingItem(sym, 'error');
+        }
+      } catch (_) { updateLoadingItem(sym, 'error'); }
+      if (i < symbols.length - 1) await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  // ── Chart ─────────────────────────────────────────────────────────────────
+  function drawChart(lines, keys) {
+    document.getElementById('chartSection').style.display = 'block';
+    const ctx = document.getElementById('compChart').getContext('2d');
+
+    if (chartInst) { chartInst.destroy(); chartInst = null; }
+
+    // Use the longest line's labels as x-axis
+    const refKey    = keys.find(k => lines[k]?.length > 0);
+    if (!refKey) return;
+    const labels = lines[refKey].map(p => p.time);
+
+    const datasets = keys
+      .filter(k => lines[k]?.length > 0)
+      .map(k => ({
+        label: PORTFOLIOS[k].name,
+        data:  lines[k].map(p => p.value),
+        borderColor: PORTFOLIOS[k].color,
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+      }));
+
+    chartInst = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        animation: { duration: 300 },
+        plugins: {
+          legend: { display: true, labels: { color: '#94a3b8', usePointStyle: true, pointStyleWidth: 10 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { maxTicksLimit: 8, maxRotation: 30, color: '#94a3b8' },
+            grid:  { color: 'rgba(51,65,85,0.5)' }
+          },
+          y: {
+            ticks: { callback: v => v.toFixed(0), color: '#94a3b8' },
+            grid:  { color: 'rgba(51,65,85,0.5)' }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Performance table ─────────────────────────────────────────────────────
+  function drawTable(lines, keys) {
+    const tbody = document.getElementById('perfTableBody');
+    tbody.innerHTML = keys
+      .filter(k => lines[k]?.length > 0)
+      .sort((a, b) => {
+        const pctA = pctChange(lines[a]);
+        const pctB = pctChange(lines[b]);
+        return pctB - pctA;
+      })
+      .map(k => {
+        const line  = lines[k];
+        const start = line[0].value.toFixed(2);
+        const end   = line[line.length - 1].value.toFixed(2);
+        const pct   = pctChange(line).toFixed(2);
+        const cls   = pct >= 0 ? 'up' : 'down';
+        const sign  = pct >= 0 ? '+' : '';
+        return `<tr>
+          <td><span class="port-dot" style="background:${PORTFOLIOS[k].color}"></span>${PORTFOLIOS[k].name}</td>
+          <td>${start}</td>
+          <td>${end}</td>
+          <td class="${cls}">${sign}${(end - start).toFixed(2)}</td>
+          <td class="${cls}">${sign}${pct}%</td>
+        </tr>`;
+      }).join('');
+
+    document.getElementById('perfTable').style.display = 'block';
+  }
+
+  function pctChange(line) {
+    if (!line || line.length < 2) return 0;
+    return ((line[line.length - 1].value - line[0].value) / line[0].value) * 100;
+  }
+
+  // ── Portfolio line calculation ────────────────────────────────────────────
+  function calcLine(stocksData, numDays) {
+    const normalized = stocksData.map(stock => {
+      const data   = [...stock.values].reverse();
+      const capped = data.slice(Math.max(0, data.length - numDays));
+      if (capped.length < 2) return null;
+      const base = parseFloat(capped[0].close);
+      return capped.map(v => ({ date: v.datetime, value: (parseFloat(v.close) / base) * 100 }));
+    }).filter(Boolean);
+
+    if (normalized.length < 2) return [];
+
+    const minLen = Math.min(...normalized.map(s => s.length));
+    return normalized[0].slice(0, minLen).map((point, i) => {
+      const vals = normalized.map(s => s[i]?.value).filter(v => v != null && !isNaN(v));
+      if (!vals.length) return null;
+      return { time: point.date, value: vals.reduce((a, b) => a + b, 0) / vals.length };
+    }).filter(Boolean);
+  }
+
+  // ── Cache helper ──────────────────────────────────────────────────────────
+  function getCached(symbol) {
+    try {
+      const raw = localStorage.getItem(`twelvedata_${symbol}`);
+      if (!raw) return null;
+      const { timestamp, values } = JSON.parse(raw);
+      if (Date.now() - timestamp < CACHE_TTL) return values;
+    } catch (_) {}
+    return null;
+  }
+
+  // ── Loading UI ────────────────────────────────────────────────────────────
+  function showLoading(symbols) {
+    const bar = document.getElementById('loadingBar');
+    bar.style.display = 'block';
+    bar.innerHTML = `<div style="font-weight:600;margin-bottom:6px;">Fetching missing data…</div>` +
+      [...symbols].map(sym => `
+        <div class="load-item" id="load-${sym}">
+          <div class="load-dot spinning" id="dot-${sym}"></div>
+          <span>${sym}</span>
+        </div>`).join('');
+  }
+
+  function updateLoadingItem(sym, status) {
+    const dot = document.getElementById(`dot-${sym}`);
+    if (!dot) return;
+    dot.classList.remove('spinning');
+    dot.style.background = status === 'done' ? '#4ade80' : status === 'error' ? '#f87171' : '#94a3b8';
+  }
+
+  function hideLoading() {
+    setTimeout(() => {
+      document.getElementById('loadingBar').style.display = 'none';
+    }, 800);
+  }
+
+  // ── Utility ───────────────────────────────────────────────────────────────
+  function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return `${r},${g},${b}`;
+  }
+</script>
+
+</body>
+</html>
