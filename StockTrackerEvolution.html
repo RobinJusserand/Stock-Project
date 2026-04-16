@@ -426,6 +426,44 @@
       font-size: 0.88rem;
     }
     .news-setup a { color: var(--accent); }
+
+    /* ── RSI sub-chart ──────────────────────────────────────── */
+    #rsiChartWrap {
+      display: none;
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+
+    .rsi-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 4px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    #rsiValue {
+      font-size: 0.85rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    #rsiZone {
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    #rsiChart { max-height: 120px; }
   </style>
 </head>
 <body>
@@ -480,11 +518,23 @@
       <button class="sma-btn" id="smaToggle">SMA 20</button>
       <!-- Volume toggle -->
       <button class="sma-btn" id="volToggle">Volume</button>
+      <!-- RSI toggle -->
+      <button class="sma-btn" id="rsiToggle">RSI 14</button>
     </div>
   </div>
 
   <div id="lineChartWrap"><canvas id="stockChart"></canvas></div>
   <div id="candleChartWrap"></div>
+
+  <!-- RSI sub-chart (line mode only) -->
+  <div id="rsiChartWrap">
+    <div class="rsi-header">
+      RSI (14)
+      <span id="rsiValue"></span>
+      <span id="rsiZone"></span>
+    </div>
+    <canvas id="rsiChart"></canvas>
+  </div>
 </section>
 
 <!-- ── Comparison ── -->
@@ -529,6 +579,10 @@
   let compValues = null;
   let compSymbol = '';
 
+  // ── RSI state ────────────────────────────────────────────────────────────
+  let showRSI    = false;
+  let rsiInstance = null;
+
   const TF_DAYS = { '1W': 5, '1M': 21, '3M': 63, '6M': 126, '1Y': 252 };
 
   // ── Wire up controls ─────────────────────────────────────────────────────
@@ -561,6 +615,12 @@
   document.getElementById('volToggle').addEventListener('click', () => {
     showVolume = !showVolume;
     document.getElementById('volToggle').classList.toggle('active', showVolume);
+    redrawChart();
+  });
+
+  document.getElementById('rsiToggle').addEventListener('click', () => {
+    showRSI = !showRSI;
+    document.getElementById('rsiToggle').classList.toggle('active', showRSI);
     redrawChart();
   });
 
@@ -693,19 +753,31 @@
       ? `${currentSymbol} vs ${compSymbol} — ${currentTF} (indexed to 100)`
       : `${currentSymbol} — ${currentTF} (${reversed.length} trading days)`;
 
-    // Hide SMA + volume in comparison mode (doesn't make sense)
+    // Hide SMA + volume + RSI in comparison/candle modes where they don't apply
     document.getElementById('smaToggle').style.display = isComparing ? 'none' : (currentType === 'line' ? '' : 'none');
     document.getElementById('volToggle').style.display = isComparing ? 'none' : '';
+    document.getElementById('rsiToggle').style.display = isComparing || currentType !== 'line' ? 'none' : '';
 
     if (currentType === 'line') {
       document.getElementById('lineChartWrap').style.display   = 'block';
       document.getElementById('candleChartWrap').style.display = 'none';
       destroyLW();
       renderLineChart(reversed, isComparing);
+
+      // RSI sub-chart (only in line, non-compare mode)
+      if (showRSI && !isComparing) {
+        document.getElementById('rsiChartWrap').style.display = 'block';
+        renderRSI(reversed);
+      } else {
+        document.getElementById('rsiChartWrap').style.display = 'none';
+        destroyRSI();
+      }
     } else {
       document.getElementById('lineChartWrap').style.display   = 'none';
       document.getElementById('candleChartWrap').style.display = 'block';
+      document.getElementById('rsiChartWrap').style.display    = 'none';
       destroyLine();
+      destroyRSI();
       renderCandleChart(reversed);
     }
   }
@@ -907,12 +979,147 @@
     });
   }
 
+  // ── RSI calculation (Wilder's smoothing, 14-period) ─────────────────────
+  function calculateRSI(prices, period = 14) {
+    if (prices.length < period + 1) return new Array(prices.length).fill(null);
+
+    const result = new Array(period).fill(null);
+
+    // Seed: simple average of first `period` changes
+    let avgGain = 0, avgLoss = 0;
+    for (let i = 1; i <= period; i++) {
+      const d = prices[i] - prices[i - 1];
+      if (d > 0) avgGain += d; else avgLoss += Math.abs(d);
+    }
+    avgGain /= period;
+    avgLoss /= period;
+    result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+
+    // Wilder's smoothing for the rest
+    for (let i = period + 1; i < prices.length; i++) {
+      const d    = prices[i] - prices[i - 1];
+      const gain = d > 0 ? d : 0;
+      const loss = d < 0 ? -d : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      result.push(avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+    }
+    return result;
+  }
+
+  // ── RSI chart renderer ───────────────────────────────────────────────────
+  function renderRSI(data) {
+    destroyRSI();
+
+    const prices    = data.map(v => parseFloat(v.close));
+    const rsiVals   = calculateRSI(prices);
+    const labels    = data.map(v => v.datetime);
+    const n         = labels.length;
+
+    // Current RSI badge
+    const last = rsiVals[rsiVals.length - 1];
+    if (last !== null) {
+      let color = '#94a3b8', zone = '', zoneBg = '';
+      if (last >= 70) { color = '#f87171'; zone = 'Overbought'; zoneBg = 'rgba(248,113,113,0.15)'; }
+      else if (last <= 30) { color = '#4ade80'; zone = 'Oversold';   zoneBg = 'rgba(74,222,128,0.15)'; }
+      document.getElementById('rsiValue').innerHTML =
+        `<span style="color:${color};">${last.toFixed(1)}</span>`;
+      document.getElementById('rsiZone').textContent  = zone;
+      document.getElementById('rsiZone').style.cssText =
+        zone ? `background:${zoneBg};color:${color};border:1px solid ${color};` : '';
+    }
+
+    const ctx = document.getElementById('rsiChart').getContext('2d');
+    rsiInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          // RSI line
+          {
+            data: rsiVals,
+            borderColor: '#f59e0b',
+            backgroundColor: 'transparent',
+            borderWidth: 1.8,
+            pointRadius: 0,
+            tension: 0.3,
+            spanGaps: false,
+            order: 1,
+          },
+          // Overbought line at 70
+          {
+            data: new Array(n).fill(70),
+            borderColor: 'rgba(248,113,113,0.55)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false,
+            order: 2,
+          },
+          // Oversold line at 30
+          {
+            data: new Array(n).fill(30),
+            borderColor: 'rgba(74,222,128,0.55)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false,
+            order: 2,
+          },
+          // Midline at 50
+          {
+            data: new Array(n).fill(50),
+            borderColor: 'rgba(148,163,184,0.2)',
+            borderWidth: 1,
+            pointRadius: 0,
+            fill: false,
+            order: 3,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        animation: { duration: 200 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.datasetIndex === 0 && ctx.parsed.y !== null
+                ? ` RSI: ${ctx.parsed.y.toFixed(1)}`
+                : null,
+              filter: item => item.datasetIndex === 0,
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { maxTicksLimit: 8, color: '#94a3b8', maxRotation: 0, font: { size: 10 } },
+            grid:  { color: 'rgba(51,65,85,0.4)' }
+          },
+          y: {
+            min: 0, max: 100,
+            ticks: {
+              stepSize: 20,
+              color: '#94a3b8',
+              font: { size: 10 },
+              callback: v => v === 30 ? '30' : v === 70 ? '70' : v === 50 ? '50' : ''
+            },
+            grid: { color: 'rgba(51,65,85,0.4)' }
+          }
+        }
+      }
+    });
+  }
+
   // ── Destroy helpers ──────────────────────────────────────────────────────
   function destroyLine() {
     if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
   }
   function destroyLW() {
     if (lwChart) { lwChart.remove(); lwChart = null; }
+  }
+  function destroyRSI() {
+    if (rsiInstance) { rsiInstance.destroy(); rsiInstance = null; }
   }
 
   // ── Fundamentals ─────────────────────────────────────────────────────────

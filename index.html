@@ -476,6 +476,18 @@
 
     footer .footer-links { margin-top: 0.75rem; }
 
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    /* ── Index card hover ───────────────────────────────────── */
+    #indexGrid > div:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
     /* ── Price Alert Panel ──────────────────────────────────── */
     #alertPanel { display: none; }
 
@@ -738,6 +750,16 @@
       </a>
     </div>
   </section>
+
+  <!-- ── Market Overview ──────────────────────────────────────── -->
+  <div style="max-width:1000px;margin:0 auto;padding:1.5rem 2rem 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;">
+      <div style="font-size:0.78rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);">U.S. Market Overview</div>
+      <span id="marketUpdateTime" style="font-size:0.74rem;color:var(--muted);"></span>
+    </div>
+    <div id="indexGrid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0.9rem;"></div>
+  </div>
+  <hr class="divider" style="margin-top:1.5rem;">
 
   <!-- ── Portfolio Dashboard (logged-in only) ─────────────── -->
   <div id="portfolioDashboard" style="display:none;">
@@ -1156,6 +1178,62 @@
         return data.values;
       } catch (_) { return null; }
     }
+
+    // ── Market Overview ──────────────────────────────────────────────────────
+    async function loadMarketOverview() {
+      const indexes = [
+        { symbol: 'SPY',  name: 'S&P 500',      label: 'SPDR S&P 500 ETF' },
+        { symbol: 'QQQ',  name: 'NASDAQ 100',   label: 'Invesco QQQ ETF' },
+        { symbol: 'DIA',  name: 'Dow Jones',    label: 'SPDR Dow Jones ETF' },
+        { symbol: 'IWM',  name: 'Russell 2000', label: 'iShares Russell 2000' },
+      ];
+
+      const grid = document.getElementById('indexGrid');
+
+      // Skeleton cards
+      grid.innerHTML = indexes.map(idx => `
+        <div id="idx-${idx.symbol}" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;animation:pulse 1.5s ease-in-out infinite;">
+          <div style="background:var(--surface2);height:10px;width:60%;border-radius:4px;margin-bottom:8px;"></div>
+          <div style="background:var(--surface2);height:18px;width:45%;border-radius:4px;margin-bottom:6px;"></div>
+          <div style="background:var(--surface2);height:12px;width:55%;border-radius:4px;"></div>
+        </div>`).join('');
+
+      for (const idx of indexes) {
+        const values = await fetchStock(idx.symbol);
+        const card   = document.getElementById(`idx-${idx.symbol}`);
+        if (!card) continue;
+
+        if (!values || values.length < 2) {
+          card.innerHTML = `<div style="font-size:0.78rem;color:var(--muted);">${idx.name}<br><span style="color:#f87171;">No data</span></div>`;
+          card.style.animation = 'none';
+          continue;
+        }
+
+        const latest = parseFloat(values[0].close);
+        const prev   = parseFloat(values[1].close);
+        const change = latest - prev;
+        const pct    = ((change / prev) * 100).toFixed(2);
+        const color  = change >= 0 ? '#4ade80' : '#f87171';
+        const arrow  = change >= 0 ? '▲' : '▼';
+        const sign   = change >= 0 ? '+' : '';
+
+        card.style.animation = 'none';
+        card.style.cursor    = 'pointer';
+        card.title           = idx.label;
+        card.onclick         = () => window.location.href = `StockTrackerEvolution.html?symbol=${idx.symbol}`;
+        card.innerHTML = `
+          <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:4px;">${idx.name}</div>
+          <div style="font-size:1.05rem;font-weight:800;margin-bottom:3px;">$${latest.toFixed(2)}</div>
+          <div style="font-size:0.8rem;font-weight:600;color:${color};">${arrow} ${sign}${Math.abs(change).toFixed(2)} (${sign}${pct}%)</div>`;
+      }
+
+      const now = new Date();
+      document.getElementById('marketUpdateTime').textContent =
+        `Updated ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+
+    // Call immediately on load (all users see the market overview)
+    loadMarketOverview();
 
     // ── Load & check alerts on login ─────────────────────────────────────────
     async function loadAlerts(uid) {
