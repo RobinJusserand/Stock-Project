@@ -833,7 +833,7 @@
         }
       } catch (_) {}
       try {
-        const res  = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=10&apikey=${TWELVE_KEY}`);
+        const res  = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=252&apikey=${TWELVE_KEY}`);
         const data = await res.json();
         if (data.status === "error" || !data.values) return null;
         localStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), values: data.values }));

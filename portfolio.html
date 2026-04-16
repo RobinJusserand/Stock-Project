@@ -549,7 +549,7 @@
       } catch (_) {}
 
       try {
-        const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=30&apikey=${TWELVE_KEY}`;
+        const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=252&apikey=${TWELVE_KEY}`;
         const res  = await fetch(url);
         const data = await res.json();
         if (data.status === "error" || !data.values) return null;
